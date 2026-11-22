@@ -91,19 +91,23 @@ html, body {
   color: var(--text-muted);
 }
 
+.subtitle strong {
+  color: #fdba74;
+}
+
 .top-actions {
   display: flex;
-  gap: 6px;
+  gap: 5px;
 }
 
 .icon-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-main);
-  font-size: 17px;
+  font-size: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -171,7 +175,7 @@ html, body {
   width: 100%;
   overflow: hidden;
   background: #f8fafc;
-  touch-action: none; /* Wichtig für S-Pen und Finger-Zeichnen */
+  touch-action: none;
 }
 
 #planCanvas {
@@ -217,16 +221,16 @@ html, body {
 .selection-bar {
   position: absolute;
   bottom: 12px;
-  left: 12px;
-  right: 12px;
-  background: rgba(15, 23, 42, 0.95);
+  left: 10px;
+  right: 10px;
+  background: rgba(15, 23, 42, 0.96);
   color: #fff;
-  padding: 8px 12px;
+  padding: 8px 10px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.3);
   z-index: 6;
 }
@@ -236,17 +240,21 @@ html, body {
 }
 
 #selectionLabel {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .selection-btns {
   display: flex;
-  gap: 6px;
+  gap: 5px;
+  flex-shrink: 0;
 }
 
 .selection-btns button {
-  padding: 6px 10px;
+  padding: 6px 8px;
   border-radius: 8px;
   border: none;
   background: var(--bg-card);
@@ -400,6 +408,7 @@ html, body {
   background: var(--bg-card);
   color: #fff;
   font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
 }
 
