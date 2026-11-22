@@ -3,192 +3,1399 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#1e293b" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <title>Aufmaß & Grundriss Planer v2</title>
-  <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/svg+xml" href="icon.svg" />
-  <link rel="apple-touch-icon" href="icon.svg" />
-  <link rel="stylesheet" href="style.css" />
+  <title>Trendfloor Aufmaß & Raumplaner v4</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#1e242b" />
+  <style>
+    :root {
+      --bg: #14181d;
+      --panel: #1e242b;
+      --panel-light: #28303a;
+      --accent: #f97316;
+      --accent-soft: rgba(249, 115, 22, 0.16);
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --border: #333d4b;
+      --blue: #0284c7;
+    }
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    header {
+      background: var(--panel);
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      z-index: 20;
+    }
+    .title-group { display: flex; align-items: center; gap: 8px; }
+    .hamburger-btn {
+      background: var(--panel-light);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .logo-badge {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      padding: 5px 8px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .app-title h1 { margin: 0; font-size: 14px; font-weight: 600; }
+    .app-title small { color: var(--muted); font-size: 11px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px; }
+    .header-actions { display: flex; gap: 5px; }
+    .icon-btn {
+      background: var(--panel-light);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 9px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .kpi-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding: 7px 10px;
+      background: #181d23;
+      border-bottom: 1px solid var(--border);
+    }
+    .kpi-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 5px 8px;
+      text-align: center;
+    }
+    .kpi-card.highlight { border-color: var(--accent); background: var(--accent-soft); }
+    .kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+    .kpi-value { font-size: 14px; font-weight: 700; margin-top: 2px; }
+    .canvas-wrap {
+      position: relative;
+      flex: 1;
+      background: #f8fafc;
+      overflow: hidden;
+      touch-action: none;
+    }
+    canvas { display: block; width: 100%; height: 100%; }
+    .floating-controls {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .float-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: #fff;
+      color: #1e293b;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+      font-size: 17px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .float-btn.snap-on { background: #1e293b; color: #f97316; border-color: #f97316; }
+    .room-pills {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      max-width: calc(100% - 65px);
+    }
+    .room-pill {
+      background: rgba(30, 36, 43, 0.92);
+      color: #fff;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .room-pill.selected { background: var(--accent); border-color: #fff; font-weight: 600; }
+
+    /* Schnell-Auswahlleiste über der unteren Leiste für Tür / Fenster */
+    .quick-picker {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      bottom: 8px;
+      background: rgba(30, 36, 43, 0.97);
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      padding: 8px 10px;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+      z-index: 15;
+    }
+    .quick-picker.open { display: flex; }
+    .quick-picker-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .quick-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .chip-btn {
+      background: var(--panel-light);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .chip-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    footer {
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      padding: 6px 4px;
+      gap: 4px;
+      z-index: 20;
+    }
+    .tool-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--muted);
+      border-radius: 8px;
+      padding: 6px 2px;
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+    }
+    .tool-btn span.ico { font-size: 17px; }
+    .tool-btn.active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    /* Hamburger Drawer (wie Office / Excel) */
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: none;
+      z-index: 60;
+    }
+    .drawer-backdrop.open { display: flex; }
+    .drawer-panel {
+      width: 290px;
+      max-width: 85vw;
+      height: 100%;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+      overflow-y: auto;
+    }
+    .drawer-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+    .menu-section { margin-bottom: 14px; }
+    .menu-section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+    .menu-item {
+      width: 100%;
+      text-align: left;
+      background: var(--panel-light);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 11px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .menu-item:hover { border-color: var(--accent); }
+    .submenu-box {
+      background: #171c22;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 4px;
+      margin-bottom: 8px;
+    }
+    .submenu-box label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; margin-top: 8px; }
+    .submenu-box label:first-child { margin-top: 0; }
+    .submenu-box input, .submenu-box select {
+      width: 100%;
+      background: var(--panel-light);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 9px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    /* Bottom Sheet Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 70;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-sheet {
+      background: var(--panel);
+      width: 100%;
+      max-width: 520px;
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      max-height: 82vh;
+      overflow-y: auto;
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .modal-header h2 { margin: 0; font-size: 16px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+    .form-group label { font-size: 12px; color: var(--muted); }
+    .form-group select, .form-group input {
+      background: var(--panel-light);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .btn-row { display: flex; gap: 8px; margin-top: 12px; }
+    .btn-primary {
+      flex: 1;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-danger {
+      background: #dc2626;
+      color: #fff;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="app-icon-badge">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2">
-          <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/>
-        </svg>
-      </div>
-      <div class="project-title-wrap">
-        <input type="text" id="projectName" value="Baustelle / Raum 1" aria-label="Projektname" />
-        <span class="subtitle" id="scaleInfo">Wandstärke: <strong id="headerWallThick">25 cm</strong></span>
+  <header>
+    <div class="title-group">
+      <button class="hamburger-btn" id="btnHamburger" title="Menü">☰</button>
+      <div class="logo-badge">TF v4</div>
+      <div class="app-title">
+        <h1 id="headerProjectTitle">BVH: Trendfloor Aufmaß</h1>
+        <small id="headerSubInfo">Raum 1 · Wandstärke 25 cm</small>
       </div>
     </div>
-
-    <div class="top-actions">
-      <button class="icon-btn" id="btnWallSettings" title="Standard-Wandstärke">🧱</button>
-      <button class="icon-btn" id="btnUndo" title="Rückgängig">↶</button>
-      <button class="icon-btn" id="btnClear" title="Alles löschen">🗑️</button>
-      <button class="icon-btn primary" id="btnProjects" title="Projekte & Export">💾</button>
+    <div class="header-actions">
+      <button class="icon-btn" id="btnUndo" title="Rückgängig">↩️</button>
+      <button class="icon-btn" id="btnReset" title="Grundriss neu">🔄</button>
+      <button class="icon-btn" id="btnExport" title="JSON Export">💾</button>
     </div>
   </header>
 
-  <!-- Live-Messwerte Leiste -->
-  <section class="metrics-bar">
-    <div class="metric-card">
-      <span class="metric-label">Fläche</span>
-      <span class="metric-value" id="valArea">0,00 m²</span>
+  <div class="kpi-bar">
+    <div class="kpi-card">
+      <div class="kpi-label" id="kpiAreaLabel">Fläche Gesamt</div>
+      <div class="kpi-value" id="kpiArea">0,00 m²</div>
     </div>
-    <div class="metric-card">
-      <span class="metric-label">Umfang gesamt</span>
-      <span class="metric-value" id="valPerimeter">0,00 lfm</span>
+    <div class="kpi-card">
+      <div class="kpi-label">Umfang Gesamt</div>
+      <div class="kpi-value" id="kpiPerim">0,00 lfm</div>
     </div>
-    <div class="metric-card accent">
-      <span class="metric-label">Sockelleisten (-Türen)</span>
-      <span class="metric-value" id="valSkirting">0,00 lfm</span>
+    <div class="kpi-card highlight">
+      <div class="kpi-label">Sockelleisten (-Türen)</div>
+      <div class="kpi-value" id="kpiSkirt">0,00 lfm</div>
     </div>
-  </section>
+  </div>
 
-  <!-- Zeichenfläche -->
-  <main class="canvas-wrapper" id="canvasWrapper">
+  <div class="canvas-wrap" id="canvasWrap">
     <canvas id="planCanvas"></canvas>
-
-    <!-- Zoom & Ansicht Controls -->
+    <div class="room-pills" id="roomPills"></div>
     <div class="floating-controls">
-      <button class="fab-mini" id="btnZoomIn" title="Hineinzoomen">+</button>
-      <button class="fab-mini" id="btnZoomOut" title="Herauszoomen">−</button>
-      <button class="fab-mini" id="btnResetView" title="Zentrieren">⌖</button>
-      <button class="fab-mini toggle-active" id="btnSnap" title="Rasterfang (10 cm)">🧲</button>
+      <button class="float-btn" id="btnZoomIn">+</button>
+      <button class="float-btn" id="btnZoomOut">−</button>
+      <button class="float-btn" id="btnCenter">⌖</button>
+      <button class="float-btn snap-on" id="btnSnap" title="Magnet-Snapping">🧲</button>
     </div>
 
-    <!-- Kontext-Aktion für ausgewähltes Element -->
-    <div class="selection-bar hidden" id="selectionBar">
-      <span id="selectionLabel">Element ausgewählt</span>
-      <div class="selection-btns">
-        <button id="btnEditLength">📏 Länge</button>
-        <button id="btnEditThickness">🧱 Stärke</button>
-        <button id="btnFlipElement">🔄 Drehen</button>
-        <button id="btnDeleteSelected" class="danger">✕</button>
+    <!-- Schnell-Auswahlleiste beim Klick unten auf Tür oder Fenster -->
+    <div class="quick-picker" id="quickPicker">
+      <div class="quick-picker-top">
+        <span id="quickPickerTitle">Tür-Auswahl</span>
+        <button class="icon-btn" id="btnClosePicker" style="padding:2px 8px;font-size:11px;">✕</button>
       </div>
+      <div class="quick-chips" id="quickChips"></div>
     </div>
-  </main>
+  </div>
 
-  <!-- Kompakte Werkzeugleiste unten (finger- & stiftfreundlich) -->
-  <footer class="toolbar">
-    <div class="tool-grid">
-      <button class="tool-btn active" data-tool="wall">
-        <span class="tool-ico">✏️</span>
-        <span class="tool-txt">Wand</span>
-      </button>
-      <button class="tool-btn" data-tool="door">
-        <span class="tool-ico">🚪</span>
-        <span class="tool-txt">Tür</span>
-      </button>
-      <button class="tool-btn" data-tool="window">
-        <span class="tool-ico">🪟</span>
-        <span class="tool-txt">Fenster</span>
-      </button>
-      <button class="tool-btn" data-tool="pattern">
-        <span class="tool-ico">🪵</span>
-        <span class="tool-txt">Verlegung</span>
-      </button>
-      <button class="tool-btn" data-tool="note">
-        <span class="tool-ico">📝</span>
-        <span class="tool-txt">Notiz</span>
-      </button>
-      <button class="tool-btn" data-tool="select">
-        <span class="tool-ico">👆</span>
-        <span class="tool-txt">Auswahl</span>
-      </button>
-    </div>
+  <footer>
+    <button class="tool-btn active" data-tool="wall"><span class="ico">✏️</span>Wand</button>
+    <button class="tool-btn" data-tool="door"><span class="ico">🚪</span>Tür</button>
+    <button class="tool-btn" data-tool="window"><span class="ico">🪟</span>Fenster</button>
+    <button class="tool-btn" data-tool="floor"><span class="ico">🪵</span>Verlegung</button>
+    <button class="tool-btn" data-tool="room"><span class="ico">🏷️</span>Raum</button>
+    <button class="tool-btn" data-tool="select"><span class="ico">👆</span>Auswahl</button>
   </footer>
 
-  <!-- Modal: Wandlänge / Öffnungsbreite / Wandstärke exakt eingeben -->
-  <div class="modal-backdrop hidden" id="lengthModal">
-    <div class="modal-card">
-      <h3 id="lengthModalTitle">Maß anpassen</h3>
-      <p class="modal-hint" id="lengthModalHint">Maß in Zentimetern (cm) eingeben:</p>
-      <div class="input-row">
-        <input type="number" id="inputCm" inputmode="decimal" step="1" min="5" max="5000" />
-        <span class="unit-tag">cm</span>
+  <!-- Hamburger Menü (Office / Excel Stil) -->
+  <div class="drawer-backdrop" id="drawerBackdrop">
+    <div class="drawer-panel">
+      <div class="drawer-title">
+        <strong>☰ Menü</strong>
+        <button class="icon-btn" id="btnCloseDrawer">✕</button>
       </div>
-      <div class="quick-presets" id="quickPresets">
-        <!-- Dynamische Schnellwahl-Buttons -->
+
+      <div class="menu-section">
+        <div class="menu-section-title">Projekt & Baustelle</div>
+        <button class="menu-item" id="menuBvhToggle">
+          <span>🏗️ BVH Eingaben</span>
+          <span>▾</span>
+        </button>
+        <div class="submenu-box" id="bvhSubmenu">
+          <label>BVH / Projekt auswählen</label>
+          <select id="bvhSelect">
+            <option value="BVH-2026-01">BVH-2026-01 · Wohnung Muster</option>
+            <option value="BVH-2026-02">BVH-2026-02 · Bürogebäude Nord</option>
+            <option value="BVH-2026-03">BVH-2026-03 · Einfamilienhaus Süd</option>
+          </select>
+          <label>Projekt eingeben / Bezeichnung</label>
+          <input type="text" id="bvhInputName" value="Wohnung Muster" placeholder="Projektname eingeben..." />
+          <label>Auftraggeber / Baustellen-Notiz</label>
+          <input type="text" id="bvhInputClient" value="Trendfloor Baustelle" placeholder="Bauherr / Objekt..." />
+          <button class="btn-primary" id="btnApplyBvh" style="margin-top:10px;width:100%;">BVH übernehmen</button>
+        </div>
       </div>
-      <div class="modal-actions">
-        <button class="btn-secondary" id="btnCancelLength">Abbrechen</button>
-        <button class="btn-primary" id="btnSaveLength">Übernehmen</button>
+
+      <div class="menu-section">
+        <div class="menu-section-title">Weitere Bereiche (später erweiterbar)</div>
+        <button class="menu-item" onclick="alert('Untermenü Material / Beläge folgt in Kürze.')">
+          <span>🪵 Beläge & Material</span>
+          <span>›</span>
+        </button>
+        <button class="menu-item" onclick="alert('Untermenü Aufmaß-Protokoll folgt in Kürze.')">
+          <span>📄 Aufmaß-Protokoll</span>
+          <span>›</span>
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- Modal: Verlegerichtung & Muster -->
-  <div class="modal-backdrop hidden" id="patternModal">
-    <div class="modal-card">
-      <h3>Verlegerichtung & Muster</h3>
-      <div class="pattern-options">
-        <button class="pattern-opt" data-pattern="none">Keine Anzeige</button>
-        <button class="pattern-opt" data-pattern="plank-0">Dielen / Schiffsboden (0° Waagerecht)</button>
-        <button class="pattern-opt" data-pattern="plank-90">Dielen / Schiffsboden (90° Senkrecht)</button>
-        <button class="pattern-opt" data-pattern="plank-45">Diagonal (45°)</button>
-        <button class="pattern-opt" data-pattern="herringbone">Fischgrät (Herringbone)</button>
+  <!-- Detail-Modal für Tür / Fenster / Raum -->
+  <div class="modal-backdrop" id="propModal">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <h2 id="modalTitle">Eigenschaften</h2>
+        <button class="icon-btn" id="btnCloseModal">✕</button>
       </div>
-      <div class="modal-actions">
-        <button class="btn-secondary" id="btnClosePattern">Schließen</button>
+      <div id="modalBody"></div>
+      <div class="btn-row">
+        <button class="btn-danger" id="btnDeleteObj">Löschen</button>
+        <button class="btn-primary" id="btnSaveObj">Übernehmen</button>
       </div>
     </div>
   </div>
 
-  <!-- Modal: Notiz hinzufügen -->
-  <div class="modal-backdrop hidden" id="noteModal">
-    <div class="modal-card">
-      <h3>Raum-Notiz / Baustellenhinweis</h3>
-      <input type="text" id="inputNoteText" placeholder="z. B. Eiche Natur geölt, Untergrund schleifen..." maxlength="60" />
-      <div class="modal-actions">
-        <button class="btn-secondary" id="btnCancelNote">Abbrechen</button>
-        <button class="btn-primary" id="btnSaveNote">Platzieren</button>
-      </div>
-    </div>
-  </div>
+  <script>
+    const GRID_M = 0.10;
+    const PX_PER_M_BASE = 68;
+    const OUTER_WALL_THICK = 0.25;
+    const INNER_WALL_THICK = 0.20;
 
-  <!-- Modal: Speichern, Laden & Export -->
-  <div class="modal-backdrop hidden" id="projectsModal">
-    <div class="modal-card modal-large">
-      <h3>Projekte & Export</h3>
+    const FLOOR_TYPES = [
+      { id: 'parkett', name: 'Parkett Eiche', color: 'rgba(217, 155, 82, 0.28)' },
+      { id: 'fliesen', name: 'Fliesen / Feinsteinzeug', color: 'rgba(148, 163, 184, 0.34)' },
+      { id: 'vinyl', name: 'Vinyl / Designbelag', color: 'rgba(168, 162, 158, 0.28)' },
+      { id: 'teppich', name: 'Teppichboden', color: 'rgba(99, 102, 241, 0.20)' }
+    ];
 
-      <div class="export-grid">
-        <button class="export-btn" id="btnSaveLocal">
-          <span>💾</span> Im Browser speichern
-        </button>
-        <button class="export-btn" id="btnExportPNG">
-          <span>🖼️</span> Als Bild (PNG)
-        </button>
-        <button class="export-btn" id="btnPrintPDF">
-          <span>📄</span> Drucken / PDF
-        </button>
-        <button class="export-btn" id="btnExportJSON">
-          <span>📦</span> Backup (JSON)
-        </button>
-      </div>
+    const DOOR_TYPES = [
+      { id: 'innentuer', label: 'Innentür' },
+      { id: 'eingangstuer', label: 'Eingangstür' },
+      { id: 'balkontuer', label: 'Balkontür' },
+      { id: 'schiebetuer', label: 'Balkonschiebetür' },
+      { id: 'durchgang', label: 'Durchgang' }
+    ];
 
-      <div class="import-row">
-        <label class="file-upload-btn">
-          📂 JSON-Backup laden
-          <input type="file" id="inputImportJSON" accept=".json,application/json" hidden />
-        </label>
-        <button class="btn-secondary small" id="btnNewProject">+ Neu</button>
-      </div>
+    const WINDOW_TYPES = [
+      { id: 'standard', label: 'Standardfenster' },
+      { id: 'bodentief', label: 'Bodentiefes Fenster' },
+      { id: 'doppelfluegel', label: 'Doppelflügelfenster' }
+    ];
 
-      <h4 class="list-heading">Gespeicherte Räume</h4>
-      <div class="saved-list" id="savedProjectsList"></div>
+    let state = {
+      tool: 'wall',
+      activeDoorType: 'innentuer',
+      activeWindowType: 'standard',
+      snap: true,
+      zoom: 1,
+      panX: 68,
+      panY: 48,
+      bvhId: 'BVH-2026-01',
+      bvhName: 'Wohnung Muster',
+      bvhClient: 'Trendfloor Baustelle',
+      walls: [],
+      openings: [],
+      roomMeta: {},
+      selectedRoomKey: null,
+      selectedOpeningId: null,
+      history: []
+    };
 
-      <div class="modal-actions">
-        <button class="btn-secondary" id="btnCloseProjects">Schließen</button>
-      </div>
-    </div>
-  </div>
+    const canvas = document.getElementById('planCanvas');
+    const ctx = canvas.getContext('2d');
 
-  <script src="app.js"></script>
+    function uid() { return Math.random().toString(36).slice(2, 9); }
+
+    function saveHistory() {
+      state.history.push(JSON.stringify({
+        walls: state.walls,
+        openings: state.openings,
+        roomMeta: state.roomMeta
+      }));
+      if (state.history.length > 30) state.history.shift();
+    }
+
+    function loadSamplePlan() {
+      // Außenraum 4.00 m x 5.00 m mit Trennwand bei y = 1.70 m und x = 2.00 m
+      state.walls = [
+        { id: 'w_top', x1: 0, y1: 0, x2: 4.0, y2: 0, thickness: OUTER_WALL_THICK, isOuter: true },
+        { id: 'w_right', x1: 4.0, y1: 0, x2: 4.0, y2: 5.0, thickness: OUTER_WALL_THICK, isOuter: true },
+        { id: 'w_bottom', x1: 4.0, y1: 5.0, x2: 0, y2: 5.0, thickness: OUTER_WALL_THICK, isOuter: true },
+        { id: 'w_left', x1: 0, y1: 5.0, x2: 0, y2: 0, thickness: OUTER_WALL_THICK, isOuter: true },
+        { id: 'w_mid_h', x1: 0, y1: 1.7, x2: 4.0, y2: 1.7, thickness: INNER_WALL_THICK, isOuter: false },
+        { id: 'w_mid_v', x1: 2.0, y1: 0, x2: 2.0, y2: 1.7, thickness: INNER_WALL_THICK, isOuter: false }
+      ];
+
+      // Türen bündig an Innen-/Außenseite der Wand (flushSide: 'pos' | 'neg')
+      state.openings = [
+        { id: 'd_ar', kind: 'door', subType: 'innentuer', wallId: 'w_mid_h', posAlong: 0.95, widthM: 0.90, flushSide: 'neg', swingDir: -1, hinge: 'start', leafOffsetM: 0.125, nicheRoomKey: '' },
+        { id: 'd_wc', kind: 'door', subType: 'innentuer', wallId: 'w_mid_h', posAlong: 3.05, widthM: 0.90, flushSide: 'pos', swingDir: 1, hinge: 'end', leafOffsetM: 0.125, nicheRoomKey: '' },
+        { id: 'd_in', kind: 'door', subType: 'eingangstuer', wallId: 'w_right', posAlong: 3.90, widthM: 0.90, flushSide: 'neg', swingDir: -1, hinge: 'end', leafOffsetM: 0.125, nicheRoomKey: '' },
+        { id: 'win_l', kind: 'window', subType: 'standard', wallId: 'w_left', posAlong: 3.30, widthM: 1.20, flushSide: 'pos', swingDir: 1, hinge: 'start', leafOffsetM: 0, nicheRoomKey: '' },
+        { id: 'win_b', kind: 'window', subType: 'standard', wallId: 'w_bottom', posAlong: 2.00, widthM: 1.20, flushSide: 'neg', swingDir: 1, hinge: 'start', leafOffsetM: 0, nicheRoomKey: '' }
+      ];
+
+      state.roomMeta = {};
+      const rooms = detectRooms();
+      rooms.forEach((r) => {
+        if (r.centroid.y < 1.7 && r.centroid.x < 2.0) state.roomMeta[r.key] = { name: 'AR', floorId: 'fliesen' };
+        else if (r.centroid.y < 1.7 && r.centroid.x >= 2.0) state.roomMeta[r.key] = { name: 'WC', floorId: 'fliesen' };
+        else state.roomMeta[r.key] = { name: 'Wohnzimmer', floorId: 'parkett' };
+      });
+
+      const arRoom = rooms.find(r => state.roomMeta[r.key]?.name === 'AR');
+      const wcRoom = rooms.find(r => state.roomMeta[r.key]?.name === 'WC');
+      const wzRoom = rooms.find(r => state.roomMeta[r.key]?.name === 'Wohnzimmer');
+      if (arRoom) state.openings.find(o => o.id === 'd_ar').nicheRoomKey = arRoom.key;
+      if (wcRoom) state.openings.find(o => o.id === 'd_wc').nicheRoomKey = wcRoom.key;
+      if (wzRoom) state.openings.find(o => o.id === 'd_in').nicheRoomKey = wzRoom.key;
+    }
+
+    // --- GEOMETRIE & RAUMTRENNUNG MIT EINZELNEN WANDABSCHNITTEN ---
+    function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+    function ptKey(p) { return `${Math.round(p.x * 1000)}_${Math.round(p.y * 1000)}`; }
+
+    function segmentIntersection(a1, a2, b1, b2) {
+      const dax = a2.x - a1.x, day = a2.y - a1.y;
+      const dbx = b2.x - b1.x, dby = b2.y - b1.y;
+      const denom = dax * dby - day * dbx;
+      if (Math.abs(denom) < 1e-9) return null;
+      const t = ((b1.x - a1.x) * dby - (b1.y - a1.y) * dbx) / denom;
+      const u = ((b1.x - a1.x) * day - (b1.y - a1.y) * dax) / denom;
+      if (t >= -1e-6 && t <= 1 + 1e-6 && u >= -1e-6 && u <= 1 + 1e-6) {
+        return {
+          x: a1.x + Math.max(0, Math.min(1, t)) * dax,
+          y: a1.y + Math.max(0, Math.min(1, t)) * day
+        };
+      }
+      return null;
+    }
+
+    function pointOnSegment(p, a, b) {
+      const len = dist(a, b);
+      if (len < 1e-6) return false;
+      return Math.abs(dist(p, a) + dist(p, b) - len) < 1e-4;
+    }
+
+    function buildGraphAndSegments() {
+      const wallPoints = state.walls.map(w => [
+        { x: w.x1, y: w.y1 },
+        { x: w.x2, y: w.y2 }
+      ]);
+
+      for (let i = 0; i < state.walls.length; i++) {
+        const w1 = state.walls[i];
+        const a1 = { x: w1.x1, y: w1.y1 }, a2 = { x: w1.x2, y: w1.y2 };
+        for (let j = i + 1; j < state.walls.length; j++) {
+          const w2 = state.walls[j];
+          const b1 = { x: w2.x1, y: w2.y1 }, b2 = { x: w2.x2, y: w2.y2 };
+          const hit = segmentIntersection(a1, a2, b1, b2);
+          if (hit) {
+            wallPoints[i].push(hit);
+            wallPoints[j].push(hit);
+          }
+          if (pointOnSegment(b1, a1, a2)) wallPoints[i].push(b1);
+          if (pointOnSegment(b2, a1, a2)) wallPoints[i].push(b2);
+          if (pointOnSegment(a1, b1, b2)) wallPoints[j].push(a1);
+          if (pointOnSegment(a2, b1, b2)) wallPoints[j].push(a2);
+        }
+      }
+
+      const nodes = new Map();
+      const edges = [];
+      const segments = []; // Einzeln geteilte Wandabschnitte mit eigenem Maß
+
+      function getNode(p) {
+        const k = ptKey(p);
+        if (!nodes.has(k)) {
+          nodes.set(k, {
+            id: k,
+            x: Math.round(p.x * 1000) / 1000,
+            y: Math.round(p.y * 1000) / 1000,
+            out: [],
+            deg: 0
+          });
+        }
+        return nodes.get(k);
+      }
+
+      for (let i = 0; i < state.walls.length; i++) {
+        const w = state.walls[i];
+        const pts = wallPoints[i]
+          .map(p => getNode(p))
+          .filter((n, idx, arr) => arr.findIndex(m => m.id === n.id) === idx)
+          .sort((p, q) => dist(p, { x: w.x1, y: w.y1 }) - dist(q, { x: w.x1, y: w.y1 }));
+
+        for (let k = 0; k < pts.length - 1; k++) {
+          const u = pts[k], v = pts[k + 1];
+          const segLen = dist(u, v);
+          if (segLen < 0.05) continue;
+          segments.push({
+            id: `${w.id}_s${k}`,
+            wallId: w.id,
+            thickness: w.thickness || INNER_WALL_THICK,
+            p1: { x: u.x, y: u.y },
+            p2: { x: v.x, y: v.y },
+            lengthM: segLen
+          });
+          const e1 = { id: edges.length, from: u, to: v, angle: Math.atan2(v.y - u.y, v.x - u.x), visited: false, wallId: w.id };
+          const e2 = { id: edges.length + 1, from: v, to: u, angle: Math.atan2(u.y - v.y, u.x - v.x), visited: false, wallId: w.id };
+          e1.twin = e2;
+          e2.twin = e1;
+          edges.push(e1, e2);
+          u.out.push(e1);
+          v.out.push(e2);
+        }
+      }
+
+      // Grad (Anzahl eindeutiger Nachbarn) pro Knoten ermitteln für T-Verbindungen
+      for (const n of nodes.values()) {
+        const uniqueTargets = new Set(n.out.map(e => e.to.id));
+        n.deg = uniqueTargets.size;
+        n.out.sort((a, b) => a.angle - b.angle);
+      }
+
+      return { nodes, edges, segments };
+    }
+
+    function detectRooms() {
+      const { edges } = buildGraphAndSegments();
+      const rooms = [];
+
+      for (const startEdge of edges) {
+        if (startEdge.visited) continue;
+        const cycle = [];
+        let curr = startEdge;
+        let guard = 0;
+        while (!curr.visited && guard++ < 200) {
+          curr.visited = true;
+          cycle.push(curr);
+          const nextNode = curr.to;
+          const outList = nextNode.out;
+          const revIdx = outList.findIndex(e => e.id === curr.twin.id);
+          if (revIdx === -1) break;
+          const nextIdx = (revIdx - 1 + outList.length) % outList.length;
+          curr = outList[nextIdx];
+        }
+
+        if (cycle.length >= 3 && curr.id === startEdge.id) {
+          const poly = cycle.map(e => ({ x: e.from.x, y: e.from.y }));
+          let signedArea = 0, cx = 0, cy = 0, perim = 0;
+          for (let i = 0; i < poly.length; i++) {
+            const p1 = poly[i], p2 = poly[(i + 1) % poly.length];
+            const cross = p1.x * p2.y - p2.x * p1.y;
+            signedArea += cross;
+            cx += (p1.x + p2.x) * cross;
+            cy += (p1.y + p2.y) * cross;
+            perim += dist(p1, p2);
+          }
+          const area = signedArea / 2;
+          if (area > 0.05) {
+            cx /= (6 * area);
+            cy /= (6 * area);
+            const sortedIds = [...new Set(poly.map(ptKey))].sort().join('|');
+            rooms.push({
+              key: sortedIds,
+              polygon: poly,
+              baseAreaM2: area,
+              nicheAreaM2: 0,
+              totalAreaM2: area,
+              perimeterM: perim,
+              centroid: { x: cx, y: cy }
+            });
+          }
+        }
+      }
+
+      // Türnischen bis unter das Türblatt hinzurechnen
+      for (const op of state.openings) {
+        if (op.kind !== 'door') continue;
+        const target = rooms.find(r => r.key === op.nicheRoomKey);
+        if (target) {
+          const nicheArea = (op.widthM || 0) * (op.leafOffsetM || 0);
+          target.nicheAreaM2 += nicheArea;
+          target.totalAreaM2 += nicheArea;
+        }
+      }
+
+      return rooms;
+    }
+
+    function calculateMetrics(rooms, segments) {
+      let area = 0, perim = 0, deduction = 0;
+
+      if (state.selectedRoomKey) {
+        const r = rooms.find(rm => rm.key === state.selectedRoomKey);
+        if (r) {
+          area = r.totalAreaM2;
+          // Umfang aus den Kanten dieses Raumpolygons summieren
+          for (let i = 0; i < r.polygon.length; i++) {
+            perim += dist(r.polygon[i], r.polygon[(i + 1) % r.polygon.length]);
+          }
+        }
+      } else {
+        for (const r of rooms) area += r.totalAreaM2;
+        for (const s of segments) perim += s.lengthM;
+      }
+
+      for (const op of state.openings) {
+        if (op.kind === 'door') {
+          const w = state.walls.find(wl => wl.id === op.wallId);
+          const isInner = w && !w.isOuter;
+          deduction += op.widthM * (isInner && !state.selectedRoomKey ? 2 : 1);
+        } else if (op.kind === 'window' && op.subType === 'bodentief') {
+          deduction += op.widthM;
+        }
+      }
+
+      const skirt = Math.max(0, perim - deduction);
+      document.getElementById('kpiAreaLabel').textContent = state.selectedRoomKey
+        ? `Fläche (${state.roomMeta[state.selectedRoomKey]?.name || 'Raum'})`
+        : 'Fläche Gesamt';
+      document.getElementById('kpiArea').textContent = `${area.toFixed(2).replace('.', ',')} m²`;
+      document.getElementById('kpiPerim').textContent = `${perim.toFixed(2).replace('.', ',')} lfm`;
+      document.getElementById('kpiSkirt').textContent = `${skirt.toFixed(2).replace('.', ',')} lfm`;
+    }
+
+    // --- ZEICHNEN: ECKEN, T-VERBINDUNGEN LEER DAZWISCHEN, EINZELNE WANDMASSE, TÜREN BÜNDIG ---
+    function toScreen(mx, my) {
+      return {
+        x: state.panX + mx * PX_PER_M_BASE * state.zoom,
+        y: state.panY + my * PX_PER_M_BASE * state.zoom
+      };
+    }
+
+    function toWorld(sx, sy) {
+      let mx = (sx - state.panX) / (PX_PER_M_BASE * state.zoom);
+      let my = (sy - state.panY) / (PX_PER_M_BASE * state.zoom);
+      if (state.snap) {
+        mx = Math.round(mx / GRID_M) * GRID_M;
+        my = Math.round(my / GRID_M) * GRID_M;
+        for (const w of state.walls) {
+          if (Math.abs(w.x1 - w.x2) < 1e-4 && Math.abs(mx - w.x1) < 0.14 && my >= Math.min(w.y1, w.y2) - 0.1 && my <= Math.max(w.y1, w.y2) + 0.1) {
+            mx = w.x1;
+          }
+          if (Math.abs(w.y1 - w.y2) < 1e-4 && Math.abs(my - w.y1) < 0.14 && mx >= Math.min(w.x1, w.x2) - 0.1 && mx <= Math.max(w.x1, w.x2) + 0.1) {
+            my = w.y1;
+          }
+        }
+      }
+      return { x: Math.round(mx * 100) / 100, y: Math.round(my * 100) / 100 };
+    }
+
+    function getOpeningWorldPos(op) {
+      const w = state.walls.find(wl => wl.id === op.wallId);
+      if (!w) return null;
+      const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
+      const len = Math.hypot(dx, dy);
+      if (len < 0.05) return null;
+      const ux = dx / len, uy = dy / len;
+      const nx = -uy, ny = ux;
+      const halfT = ((w.thickness || INNER_WALL_THICK) / 2) * (op.flushSide === 'neg' ? -1 : 1);
+      const cx = w.x1 + ux * op.posAlong + nx * halfT;
+      const cy = w.y1 + uy * op.posAlong + ny * halfT;
+      return { x: cx, y: cy, ux, uy, nx, ny, wall: w };
+    }
+
+    function render() {
+      const wrap = document.getElementById('canvasWrap');
+      canvas.width = wrap.clientWidth * devicePixelRatio;
+      canvas.height = wrap.clientHeight * devicePixelRatio;
+      ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+
+      const W = wrap.clientWidth, H = wrap.clientHeight;
+      ctx.clearRect(0, 0, W, H);
+
+      // Raster
+      const stepPx = GRID_M * 5 * PX_PER_M_BASE * state.zoom;
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1;
+      for (let x = state.panX % stepPx; x < W; x += stepPx) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      }
+      for (let y = state.panY % stepPx; y < H; y += stepPx) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      }
+
+      const { nodes, segments } = buildGraphAndSegments();
+      const rooms = detectRooms();
+      updateRoomPills(rooms);
+      calculateMetrics(rooms, segments);
+
+      // 1. Raumflächen & Bodenbeläge
+      for (const r of rooms) {
+        const meta = state.roomMeta[r.key] || { name: 'Raum', floorId: 'parkett' };
+        const fl = FLOOR_TYPES.find(f => f.id === meta.floorId) || FLOOR_TYPES[0];
+        ctx.beginPath();
+        r.polygon.forEach((p, idx) => {
+          const sp = toScreen(p.x, p.y);
+          if (idx === 0) ctx.moveTo(sp.x, sp.y);
+          else ctx.lineTo(sp.x, sp.y);
+        });
+        ctx.closePath();
+        ctx.fillStyle = fl.color;
+        ctx.fill();
+
+        if (state.selectedRoomKey === r.key) {
+          ctx.strokeStyle = '#f97316';
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+        }
+
+        const c = toScreen(r.centroid.x, r.centroid.y);
+        ctx.fillStyle = '#facc15';
+        ctx.strokeStyle = '#ca8a04';
+        ctx.lineWidth = 1.5;
+        const boxW = 90, boxH = 36;
+        ctx.beginPath();
+        ctx.roundRect(c.x - boxW / 2, c.y - boxH / 2, boxW, boxH, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(meta.name, c.x, c.y - 3);
+        ctx.font = '11px sans-serif';
+        ctx.fillText(`${r.totalAreaM2.toFixed(2).replace('.', ',')} m²`, c.x, c.y + 12);
+      }
+
+      // 2. Wandsegmente zeichnen (mit Doppelkontur & leerer T-Verbindung dazwischen)
+      for (const s of segments) {
+        const dx = s.p2.x - s.p1.x, dy = s.p2.y - s.p1.y;
+        const len = Math.hypot(dx, dy);
+        if (len < 0.02) continue;
+        const ux = dx / len, uy = dy / len;
+        const nx = -uy, ny = ux;
+        const halfT = s.thickness / 2;
+
+        // Enden leicht an T-Stößen anpassen, damit durchgehende Wände dazwischen leer bleiben
+        const n1 = nodes.get(ptKey(s.p1));
+        const n2 = nodes.get(ptKey(s.p2));
+        const trimStart = (n1 && n1.deg >= 3) ? halfT : 0;
+        const trimEnd = (n2 && n2.deg >= 3) ? halfT : 0;
+
+        const a = { x: s.p1.x + ux * trimStart, y: s.p1.y + uy * trimStart };
+        const b = { x: s.p2.x - ux * trimEnd, y: s.p2.y - uy * trimEnd };
+
+        const outer1L = toScreen(a.x + nx * halfT, a.y + ny * halfT);
+        const outer2L = toScreen(b.x + nx * halfT, b.y + ny * halfT);
+        const outer1R = toScreen(a.x - nx * halfT, a.y - ny * halfT);
+        const outer2R = toScreen(b.x - nx * halfT, b.y - ny * halfT);
+
+        // Innenkern hell/leer
+        ctx.fillStyle = '#f8fafc';
+        ctx.beginPath();
+        ctx.moveTo(outer1L.x, outer1L.y);
+        ctx.lineTo(outer2L.x, outer2L.y);
+        ctx.lineTo(outer2R.x, outer2R.y);
+        ctx.lineTo(outer1R.x, outer1R.y);
+        ctx.closePath();
+        ctx.fill();
+
+        // Konturlinien links & rechts
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(outer1L.x, outer1L.y);
+        ctx.lineTo(outer2L.x, outer2L.y);
+        ctx.moveTo(outer1R.x, outer1R.y);
+        ctx.lineTo(outer2R.x, outer2R.y);
+        ctx.stroke();
+
+        // Eigenes Maß jedes geteilten Wandabschnitts anzeigen
+        if (s.lengthM >= 0.35) {
+          const mid = toScreen((a.x + b.x) / 2, (a.y + b.y) / 2);
+          ctx.fillStyle = '#1e293b';
+          ctx.beginPath();
+          ctx.roundRect(mid.x - 23, mid.y - 9, 46, 18, 5);
+          ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 10px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(`${s.lengthM.toFixed(2).replace('.', ',')} m`, mid.x, mid.y + 3);
+        }
+      }
+
+      // 3. Türen (bündig innen/außen) & Fenster zeichnen
+      for (const op of state.openings) {
+        const info = getOpeningWorldPos(op);
+        if (!info) continue;
+        const { x: cx, y: cy, ux, uy, nx, ny, wall } = info;
+        const halfW = op.widthM / 2;
+        const s1 = toScreen(cx - ux * halfW, cy - uy * halfW);
+        const s2 = toScreen(cx + ux * halfW, cy + uy * halfW);
+        const thickPx = (wall.thickness || INNER_WALL_THICK) * PX_PER_M_BASE * state.zoom;
+
+        ctx.save();
+        if (op.kind === 'window') {
+          const wCenter = toScreen(wall.x1 + ux * op.posAlong, wall.y1 + uy * op.posAlong);
+          const ws1 = toScreen(wall.x1 + ux * (op.posAlong - halfW), wall.y1 + uy * (op.posAlong - halfW));
+          const ws2 = toScreen(wall.x1 + ux * (op.posAlong + halfW), wall.y1 + uy * (op.posAlong + halfW));
+
+          ctx.strokeStyle = '#f8fafc';
+          ctx.lineWidth = Math.max(4, thickPx - 3);
+          ctx.beginPath(); ctx.moveTo(ws1.x, ws1.y); ctx.lineTo(ws2.x, ws2.y); ctx.stroke();
+
+          ctx.strokeStyle = op.subType === 'bodentief' ? '#ea580c' : '#0284c7';
+          ctx.lineWidth = 2;
+          [-3, 0, 3].forEach(off => {
+            ctx.beginPath();
+            ctx.moveTo(ws1.x + nx * off, ws1.y + ny * off);
+            ctx.lineTo(ws2.x + nx * off, ws2.y + ny * off);
+            ctx.stroke();
+          });
+
+          const badge = toScreen(wCenter.x, wCenter.y);
+          ctx.fillStyle = state.selectedOpeningId === op.id ? '#f97316' : '#0284c7';
+          ctx.beginPath(); ctx.roundRect(badge.x - 23, badge.y - 22, 46, 17, 5); ctx.fill();
+          ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText(`${Math.round(op.widthM * 100)} cm`, badge.x, badge.y - 10);
+        } else {
+          // Tür bündig auf Innen-/Außenseite der Wand
+          const hingePt = op.hinge === 'end' ? s2 : s1;
+          const latchPt = op.hinge === 'end' ? s1 : s2;
+          const rPx = op.widthM * PX_PER_M_BASE * state.zoom;
+          const dir = op.swingDir || 1;
+
+          ctx.strokeStyle = '#0284c7';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath(); ctx.moveTo(s1.x, s1.y); ctx.lineTo(s2.x, s2.y); ctx.stroke();
+
+          if (op.subType === 'schiebetuer') {
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(s1.x + nx * 5 * dir, s1.y + ny * 5 * dir);
+            ctx.lineTo((s1.x + s2.x) / 2 + nx * 5 * dir, (s1.y + s2.y) / 2 + ny * 5 * dir);
+            ctx.stroke();
+          } else if (op.subType !== 'durchgang') {
+            const openTip = { x: hingePt.x + nx * rPx * dir, y: hingePt.y + ny * rPx * dir };
+            ctx.beginPath(); ctx.moveTo(hingePt.x, hingePt.y); ctx.lineTo(openTip.x, openTip.y); ctx.stroke();
+
+            ctx.setLineDash([4, 4]);
+            ctx.lineWidth = 1.5;
+            const a1 = Math.atan2(latchPt.y - hingePt.y, latchPt.x - hingePt.x);
+            const a2 = Math.atan2(openTip.y - hingePt.y, openTip.x - hingePt.x);
+            ctx.beginPath();
+            ctx.arc(hingePt.x, hingePt.y, rPx, a1, a2, dir < 0 ? op.hinge !== 'end' : op.hinge === 'end');
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+
+          const mid = { x: (s1.x + s2.x) / 2, y: (s1.y + s2.y) / 2 };
+          ctx.fillStyle = state.selectedOpeningId === op.id ? '#f97316' : '#0284c7';
+          ctx.beginPath(); ctx.roundRect(mid.x - 22, mid.y - 10, 44, 17, 5); ctx.fill();
+          ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText(`${Math.round(op.widthM * 100)} cm`, mid.x, mid.y + 2);
+        }
+        ctx.restore();
+      }
+
+      // Aktive Zeichenlinie beim Wandziehen
+      if (drawingStart && drawingCurr) {
+        const p1 = toScreen(drawingStart.x, drawingStart.y);
+        const p2 = toScreen(drawingCurr.x, drawingCurr.y);
+        ctx.strokeStyle = '#f97316';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    function updateRoomPills(rooms) {
+      const box = document.getElementById('roomPills');
+      box.innerHTML = '';
+      const allBtn = document.createElement('button');
+      allBtn.className = 'room-pill' + (!state.selectedRoomKey ? ' selected' : '');
+      allBtn.textContent = `Alle (${rooms.length})`;
+      allBtn.onclick = () => { state.selectedRoomKey = null; render(); };
+      box.appendChild(allBtn);
+
+      rooms.forEach((r, idx) => {
+        if (!state.roomMeta[r.key]) state.roomMeta[r.key] = { name: `Raum ${idx + 1}`, floorId: 'parkett' };
+        const btn = document.createElement('button');
+        btn.className = 'room-pill' + (state.selectedRoomKey === r.key ? ' selected' : '');
+        btn.textContent = `${state.roomMeta[r.key].name}: ${r.totalAreaM2.toFixed(2).replace('.', ',')} m²`;
+        btn.onclick = () => { state.selectedRoomKey = r.key; render(); };
+        box.appendChild(btn);
+      });
+    }
+
+    // --- SCHNELL-AUSWAHLLEISTE UNTEN FÜR TÜR & FENSTER ---
+    const quickPicker = document.getElementById('quickPicker');
+    const quickPickerTitle = document.getElementById('quickPickerTitle');
+    const quickChips = document.getElementById('quickChips');
+
+    function openQuickPicker(kind) {
+      quickChips.innerHTML = '';
+      if (kind === 'door') {
+        quickPickerTitle.textContent = 'Tür-Auswahl (tippen & im Plan setzen):';
+        DOOR_TYPES.forEach(dt => {
+          const b = document.createElement('button');
+          b.className = 'chip-btn' + (state.activeDoorType === dt.id ? ' active' : '');
+          b.textContent = dt.label;
+          b.onclick = () => {
+            state.activeDoorType = dt.id;
+            openQuickPicker('door');
+          };
+          quickChips.appendChild(b);
+        });
+        quickPicker.classList.add('open');
+      } else if (kind === 'window') {
+        quickPickerTitle.textContent = 'Fenster-Auswahl (tippen & im Plan setzen):';
+        WINDOW_TYPES.forEach(wt => {
+          const b = document.createElement('button');
+          b.className = 'chip-btn' + (state.activeWindowType === wt.id ? ' active' : '');
+          b.textContent = wt.label;
+          b.onclick = () => {
+            state.activeWindowType = wt.id;
+            openQuickPicker('window');
+          };
+          quickChips.appendChild(b);
+        });
+        quickPicker.classList.add('open');
+      } else {
+        quickPicker.classList.remove('open');
+      }
+    }
+
+    document.getElementById('btnClosePicker').onclick = () => quickPicker.classList.remove('open');
+
+    // --- INTERAKTION IM PLAN ---
+    let drawingStart = null;
+    let drawingCurr = null;
+
+    function findNearestOpening(wx, wy) {
+      let best = null, bestD = 0.45;
+      for (const op of state.openings) {
+        const info = getOpeningWorldPos(op);
+        if (!info) continue;
+        const d = dist({ x: wx, y: wy }, { x: info.x, y: info.y });
+        if (d < bestD) { bestD = d; best = op; }
+      }
+      return best;
+    }
+
+    function findNearestWall(wx, wy) {
+      let best = null, bestPos = 0.5, bestD = 0.35;
+      for (const w of state.walls) {
+        const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
+        const len = Math.hypot(dx, dy);
+        if (len < 0.2) continue;
+        const t = Math.max(0.1, Math.min(0.9, ((wx - w.x1) * dx + (wy - w.y1) * dy) / (len * len)));
+        const px = w.x1 + t * dx, py = w.y1 + t * dy;
+        const d = dist({ x: wx, y: wy }, { x: px, y: py });
+        if (d < bestD) { bestD = d; best = w; bestPos = t * len; }
+      }
+      return best ? { wall: best, posAlong: bestPos } : null;
+    }
+
+    function pointInPolygon(pt, poly) {
+      let inside = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const xi = poly[i].x, yi = poly[i].y, xj = poly[j].x, yj = poly[j].y;
+        const intersect = ((yi > pt.y) !== (yj > pt.y)) &&
+          (pt.x < (xj - xi) * (pt.y - yi) / (yj - yi + 1e-9) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const wPt = toWorld(e.clientX - rect.left, e.clientY - rect.top);
+
+      if (state.tool === 'wall') {
+        drawingStart = wPt;
+        drawingCurr = wPt;
+      } else if (state.tool === 'door' || state.tool === 'window') {
+        const hit = findNearestWall(wPt.x, wPt.y);
+        if (hit) {
+          saveHistory();
+          const rooms = detectRooms();
+          const isDoor = state.tool === 'door';
+          const op = {
+            id: uid(),
+            kind: state.tool,
+            subType: isDoor ? state.activeDoorType : state.activeWindowType,
+            wallId: hit.wall.id,
+            posAlong: hit.posAlong,
+            widthM: isDoor ? 0.90 : 1.20,
+            flushSide: 'pos',
+            swingDir: 1,
+            hinge: 'start',
+            leafOffsetM: isDoor ? 0.125 : 0,
+            nicheRoomKey: rooms[0]?.key || ''
+          };
+          state.openings.push(op);
+          state.selectedOpeningId = op.id;
+          render();
+        }
+      } else if (state.tool === 'select') {
+        const op = findNearestOpening(wPt.x, wPt.y);
+        if (op) {
+          state.selectedOpeningId = op.id;
+          openOpeningModal(op);
+          render();
+          return;
+        }
+        const rooms = detectRooms();
+        const hitRoom = rooms.find(r => pointInPolygon(wPt, r.polygon));
+        if (hitRoom) {
+          state.selectedRoomKey = hitRoom.key;
+          openRoomModal(hitRoom);
+          render();
+        }
+      } else if (state.tool === 'floor' || state.tool === 'room') {
+        const rooms = detectRooms();
+        const hitRoom = rooms.find(r => pointInPolygon(wPt, r.polygon));
+        if (hitRoom) {
+          state.selectedRoomKey = hitRoom.key;
+          openRoomModal(hitRoom);
+          render();
+        }
+      }
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!drawingStart) return;
+      const rect = canvas.getBoundingClientRect();
+      drawingCurr = toWorld(e.clientX - rect.left, e.clientY - rect.top);
+      render();
+    });
+
+    canvas.addEventListener('pointerup', () => {
+      if (drawingStart && drawingCurr && dist(drawingStart, drawingCurr) >= 0.2) {
+        saveHistory();
+        state.walls.push({
+          id: uid(),
+          x1: drawingStart.x,
+          y1: drawingStart.y,
+          x2: drawingCurr.x,
+          y2: drawingCurr.y,
+          thickness: INNER_WALL_THICK,
+          isOuter: false
+        });
+      }
+      drawingStart = null;
+      drawingCurr = null;
+      render();
+    });
+
+    // --- MODALS FÜR TÜR / FENSTER / RAUM ---
+    const modal = document.getElementById('propModal');
+    const modalBody = document.getElementById('modalBody');
+    let activeEditCallback = null;
+    let activeDeleteCallback = null;
+
+    function openOpeningModal(op) {
+      const rooms = detectRooms();
+      document.getElementById('modalTitle').textContent = op.kind === 'door'
+        ? 'Tür-Eigenschaften & Nische'
+        : 'Fenster-Eigenschaften';
+
+      if (op.kind === 'door') {
+        modalBody.innerHTML = `
+          <div class="form-group">
+            <label>Türtyp</label>
+            <select id="fSubType">
+              ${DOOR_TYPES.map(t => `<option value="${t.id}" ${op.subType === t.id ? 'selected' : ''}>${t.label}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Breite (cm)</label>
+              <input type="number" id="fWidth" value="${Math.round(op.widthM * 100)}" min="50" max="300" step="5" />
+            </div>
+            <div class="form-group">
+              <label>Tiefe bis Türblatt (cm)</label>
+              <input type="number" id="fLeafOffset" value="${(op.leafOffsetM * 100).toFixed(1)}" min="0" max="40" step="0.5" />
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Wandseite (bündig)</label>
+              <select id="fFlush">
+                <option value="pos" ${op.flushSide === 'pos' ? 'selected' : ''}>Seite A (außen/unten)</option>
+                <option value="neg" ${op.flushSide === 'neg' ? 'selected' : ''}>Seite B (innen/oben)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Öffnungsrichtung</label>
+              <select id="fSwing">
+                <option value="1" ${op.swingDir === 1 ? 'selected' : ''}>Seite A (+)</option>
+                <option value="-1" ${op.swingDir === -1 ? 'selected' : ''}>Seite B (−)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Türnische (bis unter Türblatt) addieren zu:</label>
+            <select id="fNicheRoom">
+              <option value="">-- Keine Nische addieren --</option>
+              ${rooms.map(r => `<option value="${r.key}" ${op.nicheRoomKey === r.key ? 'selected' : ''}>${state.roomMeta[r.key]?.name || 'Raum'} (+${(op.widthM * op.leafOffsetM).toFixed(2).replace('.', ',')} m²)</option>`).join('')}
+            </select>
+          </div>
+        `;
+      } else {
+        modalBody.innerHTML = `
+          <div class="form-group">
+            <label>Fenstertyp</label>
+            <select id="fSubType">
+              ${WINDOW_TYPES.map(t => `<option value="${t.id}" ${op.subType === t.id ? 'selected' : ''}>${t.label}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Fensterbreite (cm)</label>
+            <input type="number" id="fWidth" value="${Math.round(op.widthM * 100)}" min="40" max="400" step="5" />
+          </div>
+        `;
+      }
+
+      activeEditCallback = () => {
+        saveHistory();
+        op.subType = document.getElementById('fSubType').value;
+        op.widthM = Math.max(0.4, Number(document.getElementById('fWidth').value) / 100);
+        if (op.kind === 'door') {
+          op.leafOffsetM = Math.max(0, Number(document.getElementById('fLeafOffset').value) / 100);
+          op.flushSide = document.getElementById('fFlush').value;
+          op.swingDir = Number(document.getElementById('fSwing').value);
+          op.nicheRoomKey = document.getElementById('fNicheRoom').value;
+        }
+        closeModal();
+        render();
+      };
+
+      activeDeleteCallback = () => {
+        saveHistory();
+        state.openings = state.openings.filter(o => o.id !== op.id);
+        state.selectedOpeningId = null;
+        closeModal();
+        render();
+      };
+
+      modal.classList.add('open');
+    }
+
+    function openRoomModal(room) {
+      const meta = state.roomMeta[room.key] || { name: 'Raum', floorId: 'parkett' };
+      document.getElementById('modalTitle').textContent = `${meta.name} (${room.totalAreaM2.toFixed(2).replace('.', ',')} m²)`;
+      modalBody.innerHTML = `
+        <div class="form-group">
+          <label>Raumbezeichnung</label>
+          <input type="text" id="fRoomName" value="${meta.name}" />
+        </div>
+        <div class="form-group">
+          <label>Bodenbelag / Verlegung</label>
+          <select id="fFloorId">
+            ${FLOOR_TYPES.map(f => `<option value="${f.id}" ${meta.floorId === f.id ? 'selected' : ''}>${f.name}</option>`).join('')}
+          </select>
+        </div>
+        <p style="font-size:12px;color:#9ca3af;margin:6px 0 0;">
+          Grundfläche: ${room.baseAreaM2.toFixed(2).replace('.', ',')} m² · Türnischen: +${room.nicheAreaM2.toFixed(2).replace('.', ',')} m²
+        </p>
+      `;
+
+      activeEditCallback = () => {
+        saveHistory();
+        state.roomMeta[room.key] = {
+          name: document.getElementById('fRoomName').value.trim() || 'Raum',
+          floorId: document.getElementById('fFloorId').value
+        };
+        closeModal();
+        render();
+      };
+      activeDeleteCallback = null;
+      document.getElementById('btnDeleteObj').style.display = 'none';
+      modal.classList.add('open');
+    }
+
+    function closeModal() {
+      modal.classList.remove('open');
+      document.getElementById('btnDeleteObj').style.display = 'inline-block';
+    }
+
+    document.getElementById('btnCloseModal').onclick = closeModal;
+    document.getElementById('btnSaveObj').onclick = () => activeEditCallback && activeEditCallback();
+    document.getElementById('btnDeleteObj').onclick = () => activeDeleteCallback && activeDeleteCallback();
+
+    // Hamburger Drawer Logik
+    const drawerBackdrop = document.getElementById('drawerBackdrop');
+    document.getElementById('btnHamburger').onclick = () => drawerBackdrop.classList.add('open');
+    document.getElementById('btnCloseDrawer').onclick = () => drawerBackdrop.classList.remove('open');
+    drawerBackdrop.onclick = (e) => { if (e.target === drawerBackdrop) drawerBackdrop.classList.remove('open'); };
+
+    document.getElementById('bvhSelect').onchange = (e) => {
+      state.bvhId = e.target.value;
+      const optText = e.target.options[e.target.selectedIndex].text.split('·')[1]?.trim() || state.bvhId;
+      document.getElementById('bvhInputName').value = optText;
+    };
+
+    document.getElementById('btnApplyBvh').onclick = () => {
+      state.bvhName = document.getElementById('bvhInputName').value.trim() || state.bvhId;
+      state.bvhClient = document.getElementById('bvhInputClient').value.trim() || 'Trendfloor';
+      document.getElementById('headerProjectTitle').textContent = `BVH: ${state.bvhName}`;
+      document.getElementById('headerSubInfo').textContent = `${state.bvhId} · ${state.bvhClient}`;
+      drawerBackdrop.classList.remove('open');
+    };
+
+    // Untere Werkzeugleiste
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.tool = btn.dataset.tool;
+        if (state.tool === 'door') openQuickPicker('door');
+        else if (state.tool === 'window') openQuickPicker('window');
+        else openQuickPicker(null);
+      };
+    });
+
+    document.getElementById('btnZoomIn').onclick = () => { state.zoom = Math.min(2.5, state.zoom + 0.15); render(); };
+    document.getElementById('btnZoomOut').onclick = () => { state.zoom = Math.max(0.5, state.zoom - 0.15); render(); };
+    document.getElementById('btnCenter').onclick = () => { state.panX = 68; state.panY = 48; state.zoom = 1; render(); };
+    document.getElementById('btnSnap').onclick = (e) => {
+      state.snap = !state.snap;
+      e.currentTarget.classList.toggle('snap-on', state.snap);
+    };
+    document.getElementById('btnUndo').onclick = () => {
+      if (!state.history.length) return;
+      const prev = JSON.parse(state.history.pop());
+      state.walls = prev.walls;
+      state.openings = prev.openings;
+      state.roomMeta = prev.roomMeta;
+      render();
+    };
+    document.getElementById('btnReset').onclick = () => { loadSamplePlan(); render(); };
+    document.getElementById('btnExport').onclick = () => {
+      const rooms = detectRooms();
+      const data = {
+        version: 'v4',
+        bvh: { id: state.bvhId, name: state.bvhName, client: state.bvhClient },
+        rooms,
+        openings: state.openings
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `trendfloor-${state.bvhId}-v4.json`;
+      a.click();
+    };
+
+    window.addEventListener('resize', render);
+    loadSamplePlan();
+    render();
+  </script>
 </body>
 </html>
