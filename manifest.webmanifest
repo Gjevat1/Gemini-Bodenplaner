@@ -1,20 +1,17 @@
 {
-  "name": "Trendfloor Aufmaß & Raumplaner v4",
-  "short_name": "Aufmaß v4",
+  "name": "Trendfloor Bodenplan",
+  "short_name": "Bodenplan",
+  "description": "Räume zeichnen, Fläche, Verlegeplan und Materialbedarf",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#14181d",
-  "theme_color": "#1e242b",
+  "orientation": "portrait",
+  "background_color": "#f5f7fc",
+  "theme_color": "#0b2a5b",
+  "lang": "de",
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
   ]
 }
