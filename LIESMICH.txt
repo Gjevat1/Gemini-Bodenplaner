@@ -1,0 +1,15 @@
+AUFMASS & GRUNDRISS PLANER (Handy-App)
+====================================
+
+Installation / Start auf dem Handy:
+1. Diese ZIP-Datei im internen Speicher unter "Download" entpacken.
+2. Die Datei "index.html" antippen und mit Chrome / Samsung Internet / Edge öffnen.
+   (Optional: Den entpackten Ordner auf GitHub Pages hochladen und im Handy-Browser über "Zum Startbildschirm hinzufügen" als echte App installieren.)
+
+Funktionen:
+- Wände mit Finger oder S-Pen zeichnen (inkl. 10-cm-Rasterfang & Eckpunkt-Magnet)
+- Automatische Berechnung von Fläche (m²), Gesamtumfang (lfm) und Sockelleisten (lfm abzüglich Türbreiten)
+- Türen (inkl. Drehrichtung/Anschlag) & Fenster auf Wände setzen, verschieben und Breite exakt in cm anpassen
+- Verlegerichtung & Muster einblenden (Schiffsboden 0°/90°, Diagonal 45°, Fischgrät)
+- Raum-Notizen platzieren
+- Speichern im Browser, JSON-Backup, PNG-Bildexport & PDF-Druckansicht
