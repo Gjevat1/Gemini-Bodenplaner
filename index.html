@@ -401,7 +401,6 @@
     <button class="tool-btn" data-tool="select"><span class="ico">👆</span>Auswahl</button>
   </footer>
 
-  <!-- Hamburger Menü -->
   <div class="drawer-backdrop" id="drawerBackdrop">
     <div class="drawer-panel">
       <div class="drawer-title">
@@ -437,7 +436,6 @@
     </div>
   </div>
 
-  <!-- Detail-Modal -->
   <div class="modal-backdrop" id="propModal">
     <div class="modal-sheet">
       <div class="modal-header">
@@ -1029,15 +1027,43 @@
           ctx.stroke();
 
           if (s.lengthM >= 0.35) {
-            const mid = toScreen((a.x + b.x) / 2, (a.y + b.y) / 2);
+            let tBadge = 0.5;
+            const midCandidate = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+            const nearOpening = state.openings.some(op => {
+              const info = getOpeningWorldPos(op);
+              if (!info) return false;
+              const opCenter = {
+                x: info.wall.x1 + info.ux * op.posAlong,
+                y: info.wall.y1 + info.uy * op.posAlong
+              };
+              return dist(midCandidate, opCenter) < Math.max(0.65, op.widthM * 0.75);
+            });
+            if (nearOpening) {
+              const pFront = { x: a.x + (b.x - a.x) * 0.25, y: a.y + (b.y - a.y) * 0.25 };
+              const pBack  = { x: a.x + (b.x - a.x) * 0.75, y: a.y + (b.y - a.y) * 0.75 };
+              const minDistFront = Math.min(...state.openings.map(op => {
+                const info = getOpeningWorldPos(op);
+                return info ? dist(pFront, { x: info.wall.x1 + info.ux * op.posAlong, y: info.wall.y1 + info.uy * op.posAlong }) : 99;
+              }), 99);
+              const minDistBack = Math.min(...state.openings.map(op => {
+                const info = getOpeningWorldPos(op);
+                return info ? dist(pBack, { x: info.wall.x1 + info.ux * op.posAlong, y: info.wall.y1 + info.uy * op.posAlong }) : 99;
+              }), 99);
+              tBadge = minDistBack > minDistFront ? 0.75 : 0.25;
+            }
+            const bx = a.x + (b.x - a.x) * tBadge;
+            const by = a.y + (b.y - a.y) * tBadge;
+            const mid = toScreen(bx, by);
+            const sideOffsetPx = nearOpening ? 16 : 0;
+
             ctx.fillStyle = '#1e293b';
             ctx.beginPath();
-            ctx.roundRect(mid.x - 23, mid.y - 9, 46, 18, 5);
+            ctx.roundRect(mid.x - 23 + nx * sideOffsetPx, mid.y - 9 + ny * sideOffsetPx, 46, 18, 5);
             ctx.fill();
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 10px sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText(`${s.lengthM.toFixed(2).replace('.', ',')} m`, mid.x, mid.y + 3);
+            ctx.fillText(`${s.lengthM.toFixed(2).replace('.', ',')} m`, mid.x + nx * sideOffsetPx, mid.y + 3 + ny * sideOffsetPx);
           }
         }
       }
@@ -1112,6 +1138,16 @@
           ctx.fillText(`${Math.round(op.widthM * 100)} cm`, mid.x, mid.y + 2);
         }
         ctx.restore();
+      }
+
+      for (const w of state.walls) {
+        for (const pt of [{ x: w.x1, y: w.y1 }, { x: w.x2, y: w.y2 }]) {
+          const sp = toScreen(pt.x, pt.y);
+          ctx.fillStyle = '#0f172a';
+          ctx.beginPath();
+          ctx.arc(sp.x, sp.y, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
       if (drawingStart && drawingCurr) {
@@ -1193,6 +1229,61 @@
     let panLastScreen = null;
     let pointerDownScreen = null;
 
+    function findWallEndpoint(wx, wy) {
+      for (const w of state.walls) {
+        if (dist({ x: wx, y: wy }, { x: w.x1, y: w.y1 }) < 0.22) {
+          return { wall: w, end: 'start' };
+        }
+        if (dist({ x: wx, y: wy }, { x: w.x2, y: w.y2 }) < 0.22) {
+          return { wall: w, end: 'end' };
+        }
+      }
+      return null;
+    }
+
+    function openWallLengthModal(wall, end) {
+      const currentLen = Math.hypot(wall.x2 - wall.x1, wall.y2 - wall.y1);
+      document.getElementById('modalTitle').textContent = 'Wandlänge ändern';
+      modalBody.innerHTML = `
+        <div class="form-group">
+          <label>Neue Wandlänge (in Metern, z. B. 3.50)</label>
+          <input type="number" id="fWallLenM" value="${currentLen.toFixed(2)}" min="0.20" max="30.00" step="0.05" />
+        </div>
+        <p style="font-size:12px;color:#9ca3af;margin:4px 0 0;">
+          Bewegt das ${end === 'end' ? 'Ende' : 'Anfangsende'} der Wand entlang ihrer Richtung.
+        </p>
+      `;
+
+      activeEditCallback = () => {
+        const newLen = Math.max(0.20, Number(document.getElementById('fWallLenM').value) || currentLen);
+        const dx = wall.x2 - wall.x1;
+        const dy = wall.y2 - wall.y1;
+        const oldLen = Math.hypot(dx, dy) || 1;
+        const ux = dx / oldLen;
+        const uy = dy / oldLen;
+
+        saveHistory();
+        if (end === 'end') {
+          wall.x2 = Math.round((wall.x1 + ux * newLen) * 100) / 100;
+          wall.y2 = Math.round((wall.y1 + uy * newLen) * 100) / 100;
+        } else {
+          wall.x1 = Math.round((wall.x2 - ux * newLen) * 100) / 100;
+          wall.y1 = Math.round((wall.y2 - uy * newLen) * 100) / 100;
+        }
+        closeModal();
+        render();
+      };
+
+      activeDeleteCallback = () => {
+        saveHistory();
+        state.walls = state.walls.filter(item => item.id !== wall.id);
+        closeModal();
+        render();
+      };
+
+      modal.classList.add('open');
+    }
+
     function findNearestOpening(wx, wy) {
       let best = null, bestD = 0.45;
       for (const op of state.openings) {
@@ -1271,6 +1362,11 @@
           panLastScreen = { x: sx, y: sy };
         }
       } else if (state.tool === 'select') {
+        const epHit = findWallEndpoint(wPt.x, wPt.y);
+        if (epHit) {
+          openWallLengthModal(epHit.wall, epHit.end);
+          return;
+        }
         const op = findNearestOpening(wPt.x, wPt.y);
         if (op) {
           state.selectedOpeningId = op.id;
