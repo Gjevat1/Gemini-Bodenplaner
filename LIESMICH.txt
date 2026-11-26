@@ -1,12 +1,11 @@
-AUFMASS & GRUNDRISS PLANER v2 (Handy-App)
+AUFMASS & GRUNDRISS PLANER v3 (Handy-App)
 =======================================
 
-Neu in v2:
-- Wände als klassische Architektur-Doppellinien (innen leer)
-- Standard-Wandstärke über das Ziegel-Symbol (🧱) oben einstellbar (z. B. 12 cm, 25 cm, 30 cm, 38 cm)
-- Einzelne Wände nachträglich über "Auswahl -> 🧱 Stärke" individuell anpassbar
-- Deutlich erkennbare Laibungen / Nischen bei Türen, Balkontüren und Fenstern entsprechend der jeweiligen Wandstärke
-
-Installation:
-1. ZIP-Datei im internen Speicher unter "Download" entpacken.
-2. "index.html" im Handy-Browser (Chrome / Samsung Internet) öffnen.
+Neu in v3:
+- Feine Architektur-Darstellung: Dünnere Wand- und Öffnungslinien, schlanke gedrehte Maßzahlen ohne klobige Kästen und automatische Platzierung auf der freien Wandseite
+- Maße-Schalter (📏 rechts): Blendet Wand- und Öffnungsmaße bei Bedarf blitzschnell ein oder aus
+- Direkter Türanschlag-Wechsel durch Antippen: Tippe auf eine Tür (im Auswahl- oder Tür-Modus), um direkt durch alle 4 Varianten zu schalten:
+  1. Links · Innen
+  2. Links · Außen
+  3. Rechts · Innen
+  4. Rechts · Außen

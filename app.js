@@ -4,7 +4,7 @@
   const SNAP_STEP = 10; // 10 cm Rasterfang
   const GRID_MAJOR = 100; // 100 cm = 1 m
   const GRID_MINOR = 50;  // 50 cm = 0,5 m
-  const STORAGE_KEY = "aufmass_planer_projects_v2";
+  const STORAGE_KEY = "aufmass_planer_projects_v3";
 
   const canvas = document.getElementById("planCanvas");
   const ctx = canvas.getContext("2d");
@@ -14,7 +14,7 @@
   let state = {
     id: "proj_" + Date.now(),
     name: "Baustelle / Raum 1",
-    defaultWallThickness: 25, // Standard-Wandstärke in cm (z. B. 12 cm Innenwand, 25/30/38 cm Außenwand)
+    defaultWallThickness: 25,
     walls: [],     // { id, x1, y1, x2, y2, thicknessCm }
     openings: [],  // { id, type: 'door'|'window', wallId, t: 0..1, widthCm, flip: 0..3 }
     notes: [],     // { id, x, y, text } in cm
@@ -33,14 +33,17 @@
   // Interaktions-Status
   let currentTool = "wall";
   let snapEnabled = true;
+  let showAllDimensions = true; // Toggle für feine Wandmaße
   let isDrawing = false;
   let drawStart = null;
   let drawCurrent = null;
   let selectedItem = null; // { kind: 'wall'|'opening'|'note', id }
   let draggingOpening = null;
   let draggingNote = null;
+  let pointerDownPos = null;
+  let pointerMoved = false;
 
-  // Modal-Modus ('wallLength' | 'wallThickness' | 'defaultWallThickness' | 'openingWidth')
+  // Modal-Modus
   let modalMode = null;
 
   // Pinch-Zoom & Pan
@@ -143,6 +146,18 @@
     return (cm / 100).toFixed(2).replace(".", ",");
   }
 
+  // Lesbare Beschreibung des Türanschlags (DIN Links/Rechts + Innen/Außen)
+  function getDoorSwingLabel(flip) {
+    // flip 0: Links / Seite A, flip 1: Links / Seite B, flip 2: Rechts / Seite A, flip 3: Rechts / Seite B
+    const labels = [
+      "Links · Innen",
+      "Links · Außen",
+      "Rechts · Innen",
+      "Rechts · Außen"
+    ];
+    return labels[flip % 4];
+  }
+
   function projectPointOnSegment(px, py, x1, y1, x2, y2) {
     const dx = x2 - x1;
     const dy = y2 - y1;
@@ -214,6 +229,20 @@
     return areaCm2 / 10000;
   }
 
+  // Punkt-in-Polygon Test, um zu wissen, auf welcher Seite einer Wand das Raum-Innere liegt
+  function isPointInPolygon(x, y, poly) {
+    if (!poly || poly.length < 3) return false;
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i].x, yi = poly[i].y;
+      const xj = poly[j].x, yj = poly[j].y;
+      const intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-9) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
   function updateMetrics() {
     let totalPerimeterCm = 0;
     for (const w of state.walls) {
@@ -236,7 +265,7 @@
     document.getElementById("valSkirting").textContent = formatMeters(skirtingCm) + " lfm";
   }
 
-  // --- Zeichen-Engine (Doppellinien-Wände mit leerer Mitte & echten Laibungen/Nischen) ---
+  // --- Zeichen-Engine (Feine Architektur-Linien & überlagerungsfreie Bemaßung) ---
   function render() {
     const rect = wrapper.getBoundingClientRect();
     ctx.clearRect(0, 0, rect.width, rect.height);
@@ -258,8 +287,6 @@
     }
 
     // 2. Wände als hohle Doppellinien-Körper zeichnen
-    // Zuerst das helle Wand-Innere aller Wände füllen (damit Ecken sauber verschmelzen),
-    // danach die Außenkonturen (zwei parallele Linien) und Abschlusskappen zeichnen!
     for (const w of state.walls) {
       drawWallInterior(w);
     }
@@ -268,12 +295,12 @@
       drawWallOutline(w, isSel);
     }
 
-    // Aktuelle Vorschau-Wand beim Zeichnen (ebenfalls als Doppellinie)
+    // Aktuelle Vorschau-Wand beim Zeichnen
     if (isDrawing && drawStart && drawCurrent) {
       drawPreviewWall(drawStart, drawCurrent);
     }
 
-    // 3. Türen & Fenster inkl. Wand-Laibungen (Nischen)
+    // 3. Türen & Fenster inkl. Wand-Laibungen (Nischen) & feinem Maß-Text
     for (const op of state.openings) {
       const wall = state.walls.find(w => w.id === op.wallId);
       if (!wall) continue;
@@ -281,10 +308,12 @@
       drawOpeningWithReveal(op, wall, isSel);
     }
 
-    // 4. Wand-Maß-Badges (über Wänden und Öffnungen lesbar)
+    // 4. Feine, gedrehte Architektur-Maßzahlen (ohne dicke Kästen, intelligent platziert)
     for (const w of state.walls) {
       const isSel = selectedItem && selectedItem.kind === "wall" && selectedItem.id === w.id;
-      drawWallDimensionLabel(w, isSel);
+      if (showAllDimensions || isSel) {
+        drawFineWallDimension(w, isSel, poly);
+      }
     }
 
     // 5. Notizen
@@ -334,7 +363,7 @@
     }
     ctx.closePath();
 
-    ctx.fillStyle = state.pattern === "none" ? "rgba(56, 189, 248, 0.10)" : "rgba(217, 119, 6, 0.11)";
+    ctx.fillStyle = state.pattern === "none" ? "rgba(56, 189, 248, 0.08)" : "rgba(217, 119, 6, 0.10)";
     ctx.fill();
 
     if (state.pattern !== "none") {
@@ -347,8 +376,8 @@
         maxY = Math.max(maxY, p.y);
       }
 
-      ctx.strokeStyle = "rgba(180, 83, 9, 0.35)";
-      ctx.lineWidth = 1.5 / view.scale;
+      ctx.strokeStyle = "rgba(180, 83, 9, 0.30)";
+      ctx.lineWidth = 1.1 / view.scale;
 
       if (state.pattern === "plank-0") {
         const plankW = 20;
@@ -389,21 +418,20 @@
       }
     }
 
-    // m² Label in Raum-Mitte
+    // Feines, unaufdringliches m² Label in Raum-Mitte
     const cx = poly.reduce((acc, p) => acc + p.x, 0) / poly.length;
     const cy = poly.reduce((acc, p) => acc + p.y, 0) / poly.length;
     const areaM2 = computePolygonAreaM2(poly);
 
-    ctx.fillStyle = "#0f172a";
-    ctx.font = `bold ${Math.max(13, 15 / view.scale)}px sans-serif`;
+    const fontSize = Math.max(12, 13.5 / view.scale);
+    ctx.font = `700 ${fontSize}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(`${areaM2.toFixed(2).replace(".", ",")} m²`, cx, cy);
+    drawCleanHaloText(`${areaM2.toFixed(2).replace(".", ",")} m²`, cx, cy, "#0f172a", 3.5 / view.scale);
 
     ctx.restore();
   }
 
-  // Prüft, ob an einem Wand-Endpunkt eine weitere Wand anschließt (für saubere Ecken ohne Querstrich)
   function isEndpointConnected(x, y, excludeWallId) {
     const eps = 2;
     for (const other of state.walls) {
@@ -415,7 +443,6 @@
     return false;
   }
 
-  // Füllt das Innere der Wand hell (weiß), damit der Zwischenraum zwischen den zwei Linien sauber leer bleibt
   function drawWallInterior(w) {
     const len = wallLengthCm(w);
     if (len < 1) return;
@@ -430,24 +457,22 @@
     ctx.restore();
   }
 
-  // Zeichnet die zwei parallelen Wandlinien (leer in der Mitte) + Stirnseiten bei freien Wandenden
   function drawWallOutline(w, isSelected) {
     const len = wallLengthCm(w);
     if (len < 1) return;
     const thick = getWallThickness(w);
     const halfT = thick / 2;
     const angle = Math.atan2(w.y2 - w.y1, w.x2 - w.x1);
-    const lineW = Math.max(2, 2.4 / view.scale);
+    const lineW = isSelected ? Math.max(2, 2.2 / view.scale) : Math.max(1.3, 1.6 / view.scale);
 
     ctx.save();
     ctx.translate(w.x1, w.y1);
     ctx.rotate(angle);
 
-    ctx.strokeStyle = isSelected ? "#f97316" : "#0f172a";
+    ctx.strokeStyle = isSelected ? "#f97316" : "#1e293b";
     ctx.lineWidth = lineW;
     ctx.lineCap = "square";
 
-    // Die zwei parallelen Linien (oben und unten entlang der Wand)
     ctx.beginPath();
     ctx.moveTo(0, -halfT);
     ctx.lineTo(len, -halfT);
@@ -455,7 +480,6 @@
     ctx.lineTo(len, halfT);
     ctx.stroke();
 
-    // Stirnseite links/rechts nur schließen, wenn dort keine andere Wand anschließt
     const connStart = isEndpointConnected(w.x1, w.y1, w.id);
     const connEnd = isEndpointConnected(w.x2, w.y2, w.id);
 
@@ -470,10 +494,9 @@
     }
     ctx.stroke();
 
-    // Bei ausgewählter Wand: dezente Fangpunkte an den Enden anzeigen
     if (isSelected) {
       ctx.fillStyle = "#f97316";
-      const r = 5 / view.scale;
+      const r = 4.5 / view.scale;
       ctx.beginPath();
       ctx.arc(0, 0, r, 0, Math.PI * 2);
       ctx.arc(len, 0, r, 0, Math.PI * 2);
@@ -483,22 +506,73 @@
     ctx.restore();
   }
 
-  function drawWallDimensionLabel(w, isSelected) {
+  // Hilfsfunktion: Feine Schrift mit weißem Kontur-Halo (keine klobigen dunklen Kästen!)
+  function drawCleanHaloText(text, x, y, color, haloWidth) {
+    ctx.save();
+    ctx.lineJoin = "round";
+    ctx.miterLimit = 2;
+    ctx.strokeStyle = "rgba(248, 250, 252, 0.92)";
+    ctx.lineWidth = haloWidth;
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
+  // Feine, parallel zur Wand gedrehte Maßzahl auf der freien Außenseite
+  function drawFineWallDimension(w, isSelected, poly) {
     const len = wallLengthCm(w);
-    if (len <= 15) return;
+    if (len <= 12) return;
     const thick = getWallThickness(w);
     const mx = (w.x1 + w.x2) / 2;
     const my = (w.y1 + w.y2) / 2;
-    const angle = Math.atan2(w.y2 - w.y1, w.x2 - w.x1);
-    const offsetDist = thick / 2 + 16 / view.scale;
-    const nx = -Math.sin(angle) * offsetDist;
-    const ny = Math.cos(angle) * offsetDist;
+    let angle = Math.atan2(w.y2 - w.y1, w.x2 - w.x1);
+
+    // Normalenvektor bestimmen (rechts und links der Wand)
+    const nx1 = -Math.sin(angle);
+    const ny1 = Math.cos(angle);
+    const testDist = thick / 2 + 15;
+
+    // Prüfen, auf welcher Seite das Raum-Innere oder ein Tür-Drehkreis liegt -> bevorzugt gegenüberliegende Seite wählen
+    let side = 1;
+    if (poly && isPointInPolygon(mx + nx1 * testDist, my + ny1 * testDist, poly)) {
+      side = -1;
+    }
+
+    // Auch prüfen, ob eine Tür auf dieser Wand in Richtung side aufschlägt
+    const wallOpenings = state.openings.filter(o => o.wallId === w.id && o.type === "door");
+    for (const op of wallOpenings) {
+      const dirSide = (op.flip % 2 === 0) ? 1 : -1;
+      if (dirSide === side) {
+        side = -side;
+        break;
+      }
+    }
+
+    const offsetDist = thick / 2 + 11 / view.scale;
+    const tx = mx + nx1 * offsetDist * side;
+    const ty = my + ny1 * offsetDist * side;
+
+    // Text immer lesbar ausrichten (nie auf dem Kopf)
+    if (angle > Math.PI / 2 || angle <= -Math.PI / 2) {
+      angle += Math.PI;
+    }
+
+    ctx.save();
+    ctx.translate(tx, ty);
+    ctx.rotate(angle);
+
+    const fontSize = Math.max(10.5, 11.5 / view.scale);
+    ctx.font = `${isSelected ? "700" : "600"} ${fontSize}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
 
     const label = isSelected
       ? `${formatMeters(len)} m (${thick} cm)`
       : `${formatMeters(len)} m`;
 
-    drawDimensionBadge(label, mx + nx, my + ny, isSelected ? "#f97316" : "#1e293b");
+    drawCleanHaloText(label, 0, 0, isSelected ? "#ea580c" : "#334155", 3.5 / view.scale);
+    ctx.restore();
   }
 
   function drawPreviewWall(p1, p2) {
@@ -506,7 +580,7 @@
     if (len < 2) return;
     const thick = state.defaultWallThickness || 25;
     const halfT = thick / 2;
-    const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+    let angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
 
     ctx.save();
     ctx.translate(p1.x, p1.y);
@@ -516,8 +590,8 @@
     ctx.fillRect(0, -halfT, len, thick);
 
     ctx.strokeStyle = "#f97316";
-    ctx.lineWidth = Math.max(2, 2.2 / view.scale);
-    ctx.setLineDash([8 / view.scale, 6 / view.scale]);
+    ctx.lineWidth = Math.max(1.5, 1.8 / view.scale);
+    ctx.setLineDash([7 / view.scale, 5 / view.scale]);
 
     ctx.beginPath();
     ctx.moveTo(0, -halfT);
@@ -532,15 +606,25 @@
 
     ctx.restore();
 
-    drawDimensionBadge(
-      `${formatMeters(len)} m · ${thick} cm`,
-      (p1.x + p2.x) / 2,
-      (p1.y + p2.y) / 2 - (halfT + 18 / view.scale),
-      "#ea580c"
-    );
+    // Vorschau-Maß fein über der Wand
+    const mx = (p1.x + p2.x) / 2;
+    const my = (p1.y + p2.y) / 2;
+    const nx = -Math.sin(angle) * (halfT + 13 / view.scale);
+    const ny = Math.cos(angle) * (halfT + 13 / view.scale);
+    if (angle > Math.PI / 2 || angle <= -Math.PI / 2) angle += Math.PI;
+
+    ctx.save();
+    ctx.translate(mx - nx, my - ny);
+    ctx.rotate(angle);
+    const fontSize = Math.max(11, 12 / view.scale);
+    ctx.font = `700 ${fontSize}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    drawCleanHaloText(`${formatMeters(len)} m · ${thick} cm`, 0, 0, "#ea580c", 4 / view.scale);
+    ctx.restore();
   }
 
-  // Zeichnet Türen und Fenster mit klaren Laibungs-Linien (Nischen-Tiefe = Wandstärke!)
+  // Zeichnet Türen und Fenster mit klaren Laibungs-Linien & integriertem Maß
   function drawOpeningWithReveal(op, wall, isSelected) {
     const dx = wall.x2 - wall.x1;
     const dy = wall.y2 - wall.y1;
@@ -554,18 +638,18 @@
     const cx = wall.x1 + dx * op.t;
     const cy = wall.y1 + dy * op.t;
     const halfW = op.widthCm / 2;
-    const lineW = Math.max(2, 2.2 / view.scale);
+    const lineW = isSelected ? Math.max(2, 2.2 / view.scale) : Math.max(1.3, 1.6 / view.scale);
 
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(angle);
 
-    // 1. Wandlinien im Bereich der Öffnung sauber unterbrechen (Nische freischneiden)
+    // 1. Wandlinien im Bereich der Öffnung freischneiden
     ctx.fillStyle = "#f8fafc";
-    ctx.fillRect(-halfW, -halfT - 3 / view.scale, op.widthCm, thick + 6 / view.scale);
+    ctx.fillRect(-halfW, -halfT - 2.5 / view.scale, op.widthCm, thick + 5 / view.scale);
 
-    // 2. Laibungs-Linien (links und rechts die Nischentiefe über die volle Wandstärke schließen!)
-    ctx.strokeStyle = isSelected ? "#f97316" : "#0f172a";
+    // 2. Laibungs-Linien (links und rechts die Nischentiefe schließen)
+    ctx.strokeStyle = isSelected ? "#f97316" : "#1e293b";
     ctx.lineWidth = lineW;
     ctx.beginPath();
     ctx.moveTo(-halfW, -halfT);
@@ -575,18 +659,17 @@
     ctx.stroke();
 
     if (op.type === "door") {
-      // Tür (oder Balkontür): Anschlag sitzt an der Innen- oder Außenkante der Wandnische!
-      // flip: 0..3 steuert Bandseite (-halfW / +halfW) und Öffnungsrichtung (-halfT / +halfT)
-      const dirSide = (op.flip % 2 === 0) ? 1 : -1; // +1 = öffnet nach +Y, -1 = öffnet nach -Y
-      const hingeSide = (Math.floor(op.flip / 2) % 2 === 0) ? -1 : 1; // -1 = links, +1 = rechts
+      // flip: 0 = Links/Innen, 1 = Links/Außen, 2 = Rechts/Innen, 3 = Rechts/Außen
+      const dirSide = (op.flip % 2 === 0) ? 1 : -1;
+      const hingeSide = (Math.floor(op.flip / 2) % 2 === 0) ? -1 : 1;
 
       const hingeX = hingeSide * halfW;
-      const hingeY = dirSide * halfT; // Band sitzt direkt an der Nischen-Kante!
+      const hingeY = dirSide * halfT;
 
-      // Dezente Boden-Linie der Türschwelle/Nische
+      // Dezente Schwellenlinie auf der gegenüberliegenden Nischenkante
       ctx.strokeStyle = "#cbd5e1";
-      ctx.lineWidth = 1.2 / view.scale;
-      ctx.setLineDash([4 / view.scale, 4 / view.scale]);
+      ctx.lineWidth = 1 / view.scale;
+      ctx.setLineDash([3 / view.scale, 3 / view.scale]);
       ctx.beginPath();
       ctx.moveTo(-halfW, -hingeY);
       ctx.lineTo(halfW, -hingeY);
@@ -595,15 +678,15 @@
 
       // Türblatt
       ctx.strokeStyle = isSelected ? "#f97316" : "#0284c7";
-      ctx.lineWidth = Math.max(2.5, 3 / view.scale);
+      ctx.lineWidth = Math.max(2, 2.4 / view.scale);
       ctx.beginPath();
       ctx.moveTo(hingeX, hingeY);
       ctx.lineTo(hingeX, hingeY + dirSide * op.widthCm);
       ctx.stroke();
 
-      // Drehkreis (90° Bogen)
-      ctx.setLineDash([5 / view.scale, 5 / view.scale]);
-      ctx.lineWidth = 1.6 / view.scale;
+      // Feiner Drehkreis (90° Bogen)
+      ctx.setLineDash([4 / view.scale, 4 / view.scale]);
+      ctx.lineWidth = 1.2 / view.scale;
       ctx.beginPath();
       if (hingeSide < 0) {
         ctx.arc(hingeX, hingeY, op.widthCm, dirSide > 0 ? 0 : -Math.PI / 2, dirSide > 0 ? Math.PI / 2 : 0);
@@ -612,11 +695,26 @@
       }
       ctx.stroke();
       ctx.setLineDash([]);
+
+      // Kompaktes Maß direkt im Tür-Öffnungsbereich (ohne klobiges Schild!)
+      if (showAllDimensions || isSelected) {
+        ctx.save();
+        const labelX = 0;
+        const labelY = hingeY + dirSide * (op.widthCm * 0.42);
+        ctx.translate(labelX, labelY);
+        // Gegen-Rotation damit Text immer waagerecht lesbar bleibt
+        ctx.rotate(-angle);
+        const fontSize = Math.max(9.5, 10.5 / view.scale);
+        ctx.font = `700 ${fontSize}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        drawCleanHaloText(`${Math.round(op.widthCm)}`, 0, 0, isSelected ? "#ea580c" : "#0284c7", 3 / view.scale);
+        ctx.restore();
+      }
     } else {
-      // Fenster / Balkon-Fixverglasung mit sichtbarer Fensterbank/Nische innen & außen
-      // Außenkanten-Linie der Fensterbank (dünn)
+      // Fenster mit Nischenlinien
       ctx.strokeStyle = "#94a3b8";
-      ctx.lineWidth = 1.2 / view.scale;
+      ctx.lineWidth = 1 / view.scale;
       ctx.beginPath();
       ctx.moveTo(-halfW, -halfT);
       ctx.lineTo(halfW, -halfT);
@@ -624,40 +722,50 @@
       ctx.lineTo(halfW, halfT);
       ctx.stroke();
 
-      // Fensterrahmen & Glasscheibe in der Mitte der Nische
-      const frameH = Math.min(10, thick * 0.35);
+      const frameH = Math.min(8, thick * 0.32);
       ctx.strokeStyle = isSelected ? "#f97316" : "#0284c7";
-      ctx.lineWidth = Math.max(1.8, 2 / view.scale);
+      ctx.lineWidth = Math.max(1.5, 1.7 / view.scale);
       ctx.strokeRect(-halfW, -frameH / 2, op.widthCm, frameH);
 
-      // Glaslinie mittig
       ctx.beginPath();
       ctx.moveTo(-halfW, 0);
       ctx.lineTo(halfW, 0);
       ctx.stroke();
+
+      // Kompaktes Fenstermaß direkt neben der Fensterlinie
+      if (showAllDimensions || isSelected) {
+        ctx.save();
+        ctx.translate(0, -(halfT + 10 / view.scale));
+        let textAng = 0;
+        if (angle > Math.PI / 2 || angle <= -Math.PI / 2) textAng = Math.PI;
+        ctx.rotate(textAng);
+        const fontSize = Math.max(9.5, 10.5 / view.scale);
+        ctx.font = `700 ${fontSize}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        drawCleanHaloText(`${Math.round(op.widthCm)}`, 0, 0, isSelected ? "#ea580c" : "#0284c7", 3 / view.scale);
+        ctx.restore();
+      }
     }
 
     ctx.restore();
-
-    // Breiten-Label
-    drawDimensionBadge(`${Math.round(op.widthCm)} cm`, cx, cy - (halfT + 16 / view.scale), isSelected ? "#f97316" : "#0284c7");
   }
 
   function drawNote(note, isSelected) {
     ctx.save();
-    const fontSize = Math.max(12, 13 / view.scale);
+    const fontSize = Math.max(11, 12 / view.scale);
     ctx.font = `600 ${fontSize}px sans-serif`;
     const metrics = ctx.measureText(note.text);
-    const padX = 10 / view.scale;
-    const padY = 6 / view.scale;
+    const padX = 8 / view.scale;
+    const padY = 5 / view.scale;
     const boxW = metrics.width + padX * 2;
     const boxH = fontSize + padY * 2;
 
-    ctx.fillStyle = isSelected ? "#f97316" : "#fef08a";
+    ctx.fillStyle = isSelected ? "#f97316" : "rgba(254, 240, 138, 0.92)";
     ctx.strokeStyle = "#ca8a04";
-    ctx.lineWidth = 1.5 / view.scale;
+    ctx.lineWidth = 1.2 / view.scale;
     ctx.beginPath();
-    ctx.roundRect(note.x - boxW / 2, note.y - boxH / 2, boxW, boxH, 6 / view.scale);
+    ctx.roundRect(note.x - boxW / 2, note.y - boxH / 2, boxW, boxH, 5 / view.scale);
     ctx.fill();
     ctx.stroke();
 
@@ -665,25 +773,6 @@
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(note.text, note.x, note.y);
-    ctx.restore();
-  }
-
-  function drawDimensionBadge(text, x, y, bgColor) {
-    ctx.save();
-    const fontSize = Math.max(11, 12 / view.scale);
-    ctx.font = `700 ${fontSize}px sans-serif`;
-    const w = ctx.measureText(text).width + 10 / view.scale;
-    const h = fontSize + 6 / view.scale;
-
-    ctx.fillStyle = bgColor;
-    ctx.beginPath();
-    ctx.roundRect(x - w / 2, y - h / 2, w, h, 5 / view.scale);
-    ctx.fill();
-
-    ctx.fillStyle = "#fff";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, x, y);
     ctx.restore();
   }
 
@@ -699,20 +788,20 @@
       }
     }
 
-    // 2. Türen & Fenster prüfen
+    // 2. Türen & Fenster prüfen (inkl. Öffnungsbogen-Bereich bei Türen)
     for (let i = state.openings.length - 1; i >= 0; i--) {
       const op = state.openings[i];
       const wall = state.walls.find(w => w.id === op.wallId);
       if (!wall) continue;
       const ox = wall.x1 + (wall.x2 - wall.x1) * op.t;
       const oy = wall.y1 + (wall.y2 - wall.y1) * op.t;
-      const hitRadius = Math.max(baseHit, op.widthCm / 2, getWallThickness(wall) / 2 + 8);
+      const hitRadius = Math.max(baseHit, op.widthCm * 0.55, getWallThickness(wall) / 2 + 8);
       if (Math.hypot(wx - ox, wy - oy) < hitRadius) {
         return { kind: "opening", id: op.id };
       }
     }
 
-    // 3. Wände prüfen (berücksichtigt die jeweilige Wandstärke)
+    // 3. Wände prüfen
     for (let i = state.walls.length - 1; i >= 0; i--) {
       const w = state.walls[i];
       const proj = projectPointOnSegment(wx, wy, w.x1, w.y1, w.x2, w.y2);
@@ -763,11 +852,16 @@
       btnFlip.style.display = "none";
     } else if (item.kind === "opening") {
       const op = state.openings.find(x => x.id === item.id);
-      label.textContent = `${op.type === "door" ? "Tür" : "Fenster"}: ${Math.round(op.widthCm)} cm`;
+      if (op.type === "door") {
+        label.textContent = `Tür ${Math.round(op.widthCm)} cm (${getDoorSwingLabel(op.flip)})`;
+        btnFlip.style.display = "inline-block";
+      } else {
+        label.textContent = `Fenster: ${Math.round(op.widthCm)} cm`;
+        btnFlip.style.display = "none";
+      }
       btnEditLen.textContent = "📏 Breite";
       btnEditLen.style.display = "inline-block";
       btnEditThick.style.display = "none";
-      btnFlip.style.display = op.type === "door" ? "inline-block" : "none";
     } else if (item.kind === "note") {
       label.textContent = "Raum-Notiz";
       btnEditLen.style.display = "none";
@@ -788,6 +882,8 @@
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
     activePointers.set(e.pointerId, { x: sx, y: sy });
+    pointerDownPos = { x: sx, y: sy };
+    pointerMoved = false;
 
     if (activePointers.size === 2) {
       isDrawing = false;
@@ -806,6 +902,19 @@
       drawCurrent = drawStart;
       clearSelection();
     } else if (currentTool === "door" || currentTool === "window") {
+      // Falls im Tür/Fenster-Modus direkt auf eine bereits bestehende Tür getippt wird -> Richtung wechseln!
+      const existing = findElementAt(worldPt.x, worldPt.y);
+      if (existing && existing.kind === "opening") {
+        const op = state.openings.find(o => o.id === existing.id);
+        if (op && op.type === "door") {
+          pushUndo();
+          op.flip = (op.flip + 1) % 4;
+          selectElement(existing);
+          render();
+          return;
+        }
+      }
+
       const hit = findNearestWall(worldPt.x, worldPt.y);
       if (hit) {
         pushUndo();
@@ -826,7 +935,18 @@
       openNoteModal(worldPt);
     } else if (currentTool === "select") {
       const hit = findElementAt(worldPt.x, worldPt.y);
-      selectElement(hit);
+      // Wenn diese Tür BEREITS ausgewählt war und nochmal angetippt wird -> direkt Richtung wechseln (Links/Rechts/Innen/Außen)!
+      if (hit && hit.kind === "opening" && selectedItem && selectedItem.kind === "opening" && selectedItem.id === hit.id) {
+        const op = state.openings.find(o => o.id === hit.id);
+        if (op && op.type === "door") {
+          pushUndo();
+          op.flip = (op.flip + 1) % 4;
+          selectElement(hit);
+        }
+      } else {
+        selectElement(hit);
+      }
+
       if (hit && hit.kind === "opening") {
         draggingOpening = state.openings.find(o => o.id === hit.id);
       } else if (hit && hit.kind === "note") {
@@ -841,6 +961,10 @@
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
     activePointers.set(e.pointerId, { x: sx, y: sy });
+
+    if (pointerDownPos && Math.hypot(sx - pointerDownPos.x, sy - pointerDownPos.y) > 6) {
+      pointerMoved = true;
+    }
 
     if (activePointers.size === 2) {
       const pts = Array.from(activePointers.values());
@@ -871,14 +995,14 @@
 
       drawCurrent = snapped;
       render();
-    } else if (draggingOpening) {
+    } else if (draggingOpening && pointerMoved) {
       const wall = state.walls.find(w => w.id === draggingOpening.wallId);
       if (wall) {
         const proj = projectPointOnSegment(worldPt.x, worldPt.y, wall.x1, wall.y1, wall.x2, wall.y2);
         draggingOpening.t = Math.max(0.08, Math.min(0.92, proj.t));
         render();
       }
-    } else if (draggingNote) {
+    } else if (draggingNote && pointerMoved) {
       draggingNote.x = worldPt.x;
       draggingNote.y = worldPt.y;
       render();
@@ -954,7 +1078,6 @@
   }
 
   function bindUI() {
-    // Werkzeug-Auswahl
     document.querySelectorAll(".tool-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const tool = btn.dataset.tool;
@@ -969,7 +1092,6 @@
       });
     });
 
-    // Standard-Wandstärke einstellen (oben in der Leiste)
     document.getElementById("btnWallSettings").addEventListener("click", () => {
       openNumberModal({
         mode: "defaultWallThickness",
@@ -980,7 +1102,6 @@
       });
     });
 
-    // Topbar Buttons
     document.getElementById("btnUndo").addEventListener("click", undo);
 
     document.getElementById("btnClear").addEventListener("click", () => {
@@ -1000,7 +1121,7 @@
       state.name = e.target.value || "Unbenannt";
     });
 
-    // Zoom & Snap
+    // Zoom, Snap & Maße-Ein/Aus-Schalter
     document.getElementById("btnZoomIn").addEventListener("click", () => {
       view.scale = Math.min(3.5, view.scale * 1.2);
       render();
@@ -1016,6 +1137,11 @@
     document.getElementById("btnSnap").addEventListener("click", (e) => {
       snapEnabled = !snapEnabled;
       e.currentTarget.classList.toggle("toggle-active", snapEnabled);
+    });
+    document.getElementById("btnToggleDims").addEventListener("click", (e) => {
+      showAllDimensions = !showAllDimensions;
+      e.currentTarget.classList.toggle("toggle-active", showAllDimensions);
+      render();
     });
 
     // Auswahl-Aktionen
@@ -1041,6 +1167,7 @@
       if (op) {
         pushUndo();
         op.flip = (op.flip + 1) % 4;
+        selectElement(selectedItem);
         render();
       }
     });
@@ -1117,7 +1244,6 @@
       render();
     });
 
-    // Verlegemuster Modal
     document.querySelectorAll(".pattern-opt").forEach(btn => {
       btn.addEventListener("click", () => {
         pushUndo();
@@ -1131,7 +1257,6 @@
       document.getElementById("patternModal").classList.add("hidden");
     });
 
-    // Notiz Modal
     document.getElementById("btnCancelNote").addEventListener("click", () => {
       document.getElementById("noteModal").classList.add("hidden");
     });
@@ -1151,7 +1276,6 @@
       document.getElementById("noteModal").classList.add("hidden");
     });
 
-    // Projekte & Export Modal
     document.getElementById("btnProjects").addEventListener("click", () => {
       refreshSavedList();
       document.getElementById("projectsModal").classList.remove("hidden");
