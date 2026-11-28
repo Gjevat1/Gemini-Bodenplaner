@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#1e293b" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>Aufmaß & Grundriss Planer v3</title>
+  <title>Aufmaß & Grundriss Planer v4</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <link rel="apple-touch-icon" href="icon.svg" />
@@ -22,7 +22,7 @@
       </div>
       <div class="project-title-wrap">
         <input type="text" id="projectName" value="Baustelle / Raum 1" aria-label="Projektname" />
-        <span class="subtitle" id="scaleInfo">Wandstärke: <strong id="headerWallThick">25 cm</strong></span>
+        <span class="subtitle" id="scaleInfo">Wandstärke: <strong id="headerWallThick">25 cm</strong> · <span id="roomCountInfo">0 Räume</span></span>
       </div>
     </div>
 
@@ -30,14 +30,14 @@
       <button class="icon-btn" id="btnWallSettings" title="Standard-Wandstärke">🧱</button>
       <button class="icon-btn" id="btnUndo" title="Rückgängig">↶</button>
       <button class="icon-btn" id="btnClear" title="Alles löschen">🗑️</button>
-      <button class="icon-btn primary" id="btnProjects" title="Projekte & Export">💾</button>
+      <button class="icon-btn primary" id="btnProjects" title="Projekte speichern, laden & Export">💾</button>
     </div>
   </header>
 
   <!-- Live-Messwerte Leiste -->
   <section class="metrics-bar">
     <div class="metric-card">
-      <span class="metric-label">Fläche</span>
+      <span class="metric-label">Fläche gesamt</span>
       <span class="metric-value" id="valArea">0,00 m²</span>
     </div>
     <div class="metric-card">
@@ -67,7 +67,8 @@
     <div class="selection-bar hidden" id="selectionBar">
       <span id="selectionLabel">Element ausgewählt</span>
       <div class="selection-btns">
-        <button id="btnEditLength">📏 Länge</button>
+        <button id="btnTypeMenu">🏷️ Typ</button>
+        <button id="btnEditLength">📏 Maß</button>
         <button id="btnEditThickness">🧱 Stärke</button>
         <button id="btnFlipElement">🔄 Anschlag</button>
         <button id="btnDeleteSelected" class="danger">✕</button>
@@ -122,6 +123,18 @@
     </div>
   </div>
 
+  <!-- Modal: Typ-Auswahl für Wände (Wand / Trennwand) sowie Türen & Fenster -->
+  <div class="modal-backdrop hidden" id="typeModal">
+    <div class="modal-card">
+      <h3 id="typeModalTitle">Typ wählen</h3>
+      <p class="modal-hint" id="typeModalHint">Ausführung und Standardbreite festlegen:</p>
+      <div class="pattern-options" id="typeOptionsList"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="btnCloseTypeModal">Schließen</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Verlegerichtung & Muster -->
   <div class="modal-backdrop hidden" id="patternModal">
     <div class="modal-card">
@@ -154,12 +167,14 @@
   <!-- Modal: Speichern, Laden & Export -->
   <div class="modal-backdrop hidden" id="projectsModal">
     <div class="modal-card modal-large">
-      <h3>Projekte & Export</h3>
+      <h3>Projekte speichern & verwalten</h3>
+
+      <div class="save-current-box">
+        <input type="text" id="saveProjectNameInput" placeholder="Projektname zum Speichern..." maxlength="60" />
+        <button class="btn-primary small" id="btnSaveLocal">💾 Speichern</button>
+      </div>
 
       <div class="export-grid">
-        <button class="export-btn" id="btnSaveLocal">
-          <span>💾</span> Im Browser speichern
-        </button>
         <button class="export-btn" id="btnExportPNG">
           <span>🖼️</span> Als Bild (PNG)
         </button>
@@ -169,6 +184,9 @@
         <button class="export-btn" id="btnExportJSON">
           <span>📦</span> Backup (JSON)
         </button>
+        <button class="btn-secondary small" id="btnNewProject">
+          <span>+</span> Neues Projekt
+        </button>
       </div>
 
       <div class="import-row">
@@ -176,10 +194,9 @@
           📂 JSON-Backup laden
           <input type="file" id="inputImportJSON" accept=".json,application/json" hidden />
         </label>
-        <button class="btn-secondary small" id="btnNewProject">+ Neu</button>
       </div>
 
-      <h4 class="list-heading">Gespeicherte Räume</h4>
+      <h4 class="list-heading">Gespeicherte Projekte</h4>
       <div class="saved-list" id="savedProjectsList"></div>
 
       <div class="modal-actions">
